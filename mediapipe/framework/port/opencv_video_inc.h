@@ -85,13 +85,14 @@ inline int fourcc(char c1, char c2, char c3, char c4) {
 #include <opencv2/videoio.hpp>
 
 #if CV_VERSION_MAJOR == 4 && !defined(MEDIAPIPE_MOBILE)
-#include <opencv2/optflow.hpp>
-
-namespace cv {
-inline Ptr<DenseOpticalFlow> createOptFlow_DualTVL1() {
-  return optflow::createOptFlow_DualTVL1();
-}
-}  // namespace cv
+//#include <opencv2/video/tracking.hpp>
+//#include <opencv2/superres/optical_flow.hpp>
+//namespace cv {
+//inline Ptr<DenseOpticalFlow> createOptFlow_DualTVL1() {
+  //return createOptFlow_DualTVL1();
+  //return optflow::DualTVL1OpticalFlow_create();
+//}
+//}  // namespace cv
 #endif
 
 namespace mediapipe {

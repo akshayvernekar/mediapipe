@@ -1,0 +1,40 @@
+# MediaPipe graph that performs face detection with TensorFlow Lite on CPU.
+# Used in the examples in
+# mediapipe/examples/desktop/face_detection:face_detection_cpu.
+
+# Images on GPU coming into and out of the graph.
+input_stream: "input_video"
+input_stream: "select"
+output_stream: "output_video"
+
+# VIDEO_PREP: Create a low frame rate stream for feature extraction.
+node {
+  calculator: "DemuxCalculator"
+  input_stream: "IN_IMG:input_video"
+  input_stream: "SELECT:select"
+  output_stream: "OUT_IMG0:input_one"
+  output_stream: "OUT_IMG1:input_two"
+}
+
+node {
+  calculator: "AutoFrameSubgraph"
+  input_stream: "IMAGE:input_one"
+  output_stream: "IMAGE:output_one"
+}
+
+node {
+  calculator: "HandGestureRecognitionSubgraph"
+  input_stream: "IMAGE:input_two"
+  output_stream: "IMAGE:output_two"
+}
+
+node {
+  calculator: "MuxCalculator"
+  input_stream: "INPUT:0:output_one"
+  input_stream: "INPUT:1:output_two"
+  input_stream: "SELECT:select"
+  output_stream: "OUTPUT:output_video"
+  input_stream_handler: {
+    input_stream_handler: "MuxInputStreamHandler",
+  }
+}

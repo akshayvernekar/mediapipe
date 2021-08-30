@@ -137,6 +137,39 @@ void ImageFrameToYUVNV12Image(const ImageFrame& image_frame,
   CHECK_EQ(0, rv);
 }
 
+
+void ImageFrameToYUV2Image(const ImageFrame& image_frame,
+                              YUVImage* yuv_yuy2_image) {
+  // Create a YUV I420 image that will hold the converted RGBA image.
+  YUVImage yuv_i420_image;
+  ImageFrameToYUVImage(image_frame, &yuv_i420_image);
+
+  // Now create a YUV NV12 image and convert the I420 to NV12.
+  const int width = yuv_i420_image.width();
+  const int height = yuv_i420_image.height();
+  const int y_stride = yuv_i420_image.stride(0);
+  const int y_size = y_stride * height;
+  const int uv_stride = y_stride/2;
+  const int uv_height = height;
+  const int uv_size = uv_stride * uv_height;
+
+  uint8* data = reinterpret_cast<uint8*>(aligned_malloc(y_size + uv_size*2, 16));
+  std::function<void()> deallocate = [data] { aligned_free(data); };
+  uint8* y = data;
+  uint8* uv1 = y + y_size;
+  uint8* uv2 = uv1 + uv_size;
+  yuv_yuy2_image->Initialize(libyuv::FOURCC_YUY2, deallocate, y, y_stride, nullptr,
+                             0, nullptr, 0, width, height);
+  // stide of yuy2 = y_stride + (uv_stride*2) = 2 * y_stride
+  const int rv = libyuv::I420ToYUY2(
+      yuv_i420_image.data(0), yuv_i420_image.stride(0), 
+      yuv_i420_image.data(1), yuv_i420_image.stride(1), 
+      yuv_i420_image.data(2), yuv_i420_image.stride(2), 
+      yuv_yuy2_image->mutable_data(0), y_stride*2,
+      width, height);
+  CHECK_EQ(0, rv);
+}
+
 void YUVImageToImageFrame(const YUVImage& yuv_image, ImageFrame* image_frame,
                           bool use_bt709) {
   CHECK(image_frame);

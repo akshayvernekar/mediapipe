@@ -1,0 +1,114 @@
+# MediaPipe graph that performs face detection with TensorFlow Lite on CPU.
+# Used in the examples in
+# mediapipe/examples/desktop/face_detection:face_detection_cpu.
+
+# Images on GPU coming into and out of the graph.
+type: "AutoFrameSubgraph"
+
+input_stream: "IMAGE:throttled_input_video"
+output_stream: "IMAGE:output_video"
+
+# Throttles the images flowing downstream for flow control. It passes through
+# the very first incoming image unaltered, and waits for
+# TfLiteTensorsToDetectionsCalculator downstream in the graph to finish
+# generating the corresponding detections before it passes through another
+# image. All images that come in while waiting are dropped, limiting the number
+# of in-flight images between this calculator and
+# TfLiteTensorsToDetectionsCalculator to 1. This prevents the nodes in between
+# from queuing up incoming images and data excessively, which leads to increased
+# latency and memory usage, unwanted in real-time mobile applications. It also
+# eliminates unnecessarily computation, e.g., a transformed image produced by
+# ImageTransformationCalculator may get dropped downstream if the subsequent
+# TfLiteConverterCalculator or TfLiteInferenceCalculator is still busy
+# processing previous inputs.
+# node {
+#   calculator: "FlowLimiterCalculator"
+#   input_stream: "input_video"
+#   input_stream: "FINISHED:detections"
+#   input_stream_info: {
+#     tag_index: "FINISHED"
+#     back_edge: true
+#   }
+#   output_stream: "throttled_input_video"
+# }
+
+
+# VIDEO_PREP: Create a low frame rate stream for feature extraction.
+# node {
+#   calculator: "PacketThinnerCalculator"
+#   input_stream: "input_video"
+#   output_stream: "throttled_input_video"
+#   options: {
+#     [mediapipe.PacketThinnerCalculatorOptions.ext]: {
+#       thinner_type: ASYNC
+#       period: 20000
+#     }
+#   }
+# }
+
+
+# Subgraph that detects faces.
+node {
+  calculator: "FaceDetectionShortRangeCpu"
+  input_stream: "IMAGE:throttled_input_video"
+  output_stream: "DETECTIONS:detections"
+}
+
+# Subgraph that fetches rectangle faces.
+node {
+  calculator: "ImagePropertiesCalculator"
+  input_stream: "IMAGE:throttled_input_video"
+  output_stream: "SIZE:size"
+}
+
+# Keeps track of face landmarks from the previous frame.
+node {
+  calculator: "PreviousLoopbackCalculator"
+  input_stream: "MAIN:size"
+  input_stream: "LOOP:normalised_roi"
+  input_stream_info: {
+    tag_index: "LOOP"
+    back_edge: true
+  }
+  output_stream: "PREV_LOOP:prev_normalised_roi"
+}
+
+# Subgraph that fetches rectangle faces.
+node {
+  calculator: "DetectionsToAutoframeROICalculator"
+  input_stream: "DETECTIONS:detections"
+  input_stream: "IMAGE_SIZE:size"
+  input_stream: "PREV_ROI:prev_normalised_roi"
+  output_stream: "NORM_RECT:normalised_roi"
+}
+
+
+# Subgraph that fetches rectangle faces.
+node {
+  calculator: "ImageCroppingCalculator"
+  input_stream: "NORM_RECT:normalised_roi"
+  input_stream: "IMAGE:throttled_input_video"
+  output_stream: "IMAGE:cropped_video"  
+  node_options: {
+    [type.googleapis.com/mediapipe.ImageCroppingCalculatorOptions] {
+      border_mode: BORDER_REPLICATE
+    }
+  }
+}
+
+
+# Transforms the input image on CPU to a 128x128 image. To scale the input
+# image, the scale_mode option is set to FIT to preserve the aspect ratio,
+# resulting in potential letterboxing in the transformed image.
+node: {
+  calculator: "ImageTransformationCalculator"
+  input_stream: "IMAGE:cropped_video"
+  output_stream: "IMAGE:output_video"
+  options: {
+    [mediapipe.ImageTransformationCalculatorOptions.ext] {
+      output_width: 640
+      output_height: 480
+      scale_mode: FIT
+    }
+  }
+}

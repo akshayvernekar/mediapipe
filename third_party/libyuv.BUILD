@@ -14,6 +14,9 @@ cc_library(
             "include/libyuv/*.h",
         ],
     ),
+    defines = [
+        "LIBYUV_DISABLE_NEON"
+    ],
     hdrs = [
         "include/libyuv/compare.h",
         "include/libyuv/convert.h",

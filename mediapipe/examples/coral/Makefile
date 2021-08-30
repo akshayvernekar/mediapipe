@@ -32,9 +32,10 @@ help:
 ifeq (,$(wildcard /.dockerenv))
 .PHONY: docker
 docker:
-	docker run --rm -i --tty \
+	docker run -i --tty \
 	    -v $(MEDIAPIPE_DIR):/mediapipe \
 	    --workdir /mediapipe/ \
+	    --name BuildContainer \
 	    $(shell docker build -q - < $(DOCKER_FILE)) \
 	    /bin/bash -c "$(call run_command,$(DOCKER_COMMAND))"
 endif

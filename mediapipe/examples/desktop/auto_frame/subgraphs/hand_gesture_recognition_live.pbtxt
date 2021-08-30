@@ -1,0 +1,72 @@
+# MediaPipe graph that performs hands tracking on desktop with TensorFlow
+# Lite on CPU.
+# Used in the example in
+# mediapipe/examples/desktop/hand_tracking:hand_tracking_cpu.
+
+type: "HandGestureRecognitionSubgraph"
+
+# CPU image. (ImageFrame)
+input_stream: "IMAGE:input_video"
+
+# CPU image. (ImageFrame)
+output_stream: "IMAGE:output_video"
+
+# Generates side packet cotaining max number of hands to detect/track.
+node {
+  calculator: "ConstantSidePacketCalculator"
+  output_side_packet: "PACKET:num_hands"
+  node_options: {
+    [type.googleapis.com/mediapipe.ConstantSidePacketCalculatorOptions]: {
+      packet { int_value: 1 }
+    }
+  }
+}
+
+# Throttles the images flowing downstream for flow control. It passes through
+# the very first incoming image unaltered, and waits for
+# TfLiteTensorsToDetectionsCalculator downstream in the graph to finish
+# generating the corresponding detections before it passes through another
+# image. All images that come in while waiting are dropped, limiting the number
+# of in-flight images between this calculator and
+# TfLiteTensorsToDetectionsCalculator to 1. This prevents the nodes in between
+# from queuing up incoming images and data excessively, which leads to increased
+# latency and memory usage, unwanted in real-time mobile applications. It also
+# eliminates unnecessarily computation, e.g., a transformed image produced by
+# ImageTransformationCalculator may get dropped downstream if the subsequent
+# TfLiteConverterCalculator or TfLiteInferenceCalculator is still busy
+# processing previous inputs.
+node {
+  calculator: "FlowLimiterCalculator"
+  input_stream: "input_video"
+  input_stream: "FINISHED:landmarks"
+  input_stream_info: {
+    tag_index: "FINISHED"
+    back_edge: true
+  }
+  output_stream: "throttled_input_video"
+}
+
+# Detects/tracks hand landmarks.
+node {
+  calculator: "HandLandmarkTrackingCpu"
+  input_stream: "IMAGE:throttled_input_video"
+  input_side_packet: "NUM_HANDS:num_hands"
+  output_stream: "LANDMARKS:landmarks"
+  output_stream: "HANDEDNESS:handedness"
+  output_stream: "PALM_DETECTIONS:multi_palm_detections"
+  output_stream: "HAND_ROIS_FROM_LANDMARKS:multi_hand_rects"
+  output_stream: "HAND_ROIS_FROM_PALM_DETECTIONS:multi_palm_rects"
+}
+
+node{
+  calculator: "HandGestureRecognitionCalculator",
+  input_stream: "LANDMARKS:landmarks",
+  output_stream: "RECOGNIZED_HAND_GESTURE:gesture"
+}
+
+node{
+  calculator: "PutTextOnImageCalculator",
+  input_stream: "IN_IMG:throttled_input_video",
+  input_stream: "GESTURE:gesture",
+  output_stream: "OUT_IMG:output_video"
+}

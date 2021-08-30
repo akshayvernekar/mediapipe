@@ -55,6 +55,10 @@ void ImageFrameToYUVImage(const ImageFrame& image_frame, YUVImage* yuv_image);
 void ImageFrameToYUVNV12Image(const ImageFrame& image_frame,
                               YUVImage* yuv_nv12_image);
 
+// Convert an SRGB ImageFrame to a 420p YUY2Image.
+void ImageFrameToYUV2Image(const ImageFrame& image_frame,
+                              YUVImage* yuv_nv12_image);            
+
 // Convert a YUVImage to an SRGB ImageFrame. If use_bt709 is set to false, this
 // function will assume that the YUV is as defined in BT.601 (standard from the
 // 1980s). Most content is using BT.709 (as of 2019), but it's likely that this
