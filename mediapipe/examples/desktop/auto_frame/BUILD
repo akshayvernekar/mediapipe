@@ -35,7 +35,6 @@ cc_binary(
         "//mediapipe/framework/port:status",
         "//mediapipe/calculators/core:mux_calculator",
         "//mediapipe/examples/desktop/auto_frame/calculators:demux_calculator",
-       # "//mediapipe/examples/desktop/auto_frame/calculators:mux_calculator",
         "//mediapipe/examples/desktop/auto_frame/subgraphs:auto_frame_graph",
         "//mediapipe/examples/desktop/auto_frame/subgraphs:hand_gesture_recognition_live",
         "//mediapipe/framework/stream_handler:sync_set_input_stream_handler",

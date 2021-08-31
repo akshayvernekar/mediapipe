@@ -19,6 +19,21 @@ You only have to run the above command first time, the environment is saved on d
 docker run -i BuildContainer
 ```
 
+### Installing Opencv 4.4
+The docker tries to use Opencv 3.4 but NXP EVK uses Opencv 4.4.0, the repository supplies the precompiled binaries in opencv32_arm64_libs_nxp , but we still have to install the header files.
+
+```bash
+cd ~
+git clone https://github.com/opencv/opencv.git 
+cd opencv
+git checkout tags/4.4.0 -b 4.4.0
+mkdir build
+cd build
+cmake -D CMAKE_BUILD_TYPE=Release -D CMAKE_INSTALL_PREFIX=/usr/local ..
+make -j4 
+make install
+```
+
 After running this command you'll get a shell to the Docker environment which
 has everything ready to start compilation:
 
