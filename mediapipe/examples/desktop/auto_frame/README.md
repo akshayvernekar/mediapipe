@@ -31,7 +31,7 @@ mkdir build
 cd build
 cmake -D CMAKE_BUILD_TYPE=Release -D CMAKE_INSTALL_PREFIX=/usr/local ..
 make -j4 
-make install
+sudo make install
 ```
 
 After running this command you'll get a shell to the Docker environment which
