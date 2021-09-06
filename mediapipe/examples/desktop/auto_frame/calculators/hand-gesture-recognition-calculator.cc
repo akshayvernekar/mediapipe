@@ -3,6 +3,7 @@
 #include "mediapipe/framework/formats/landmark.pb.h"
 #include "mediapipe/framework/formats/rect.pb.h"
 #include <vector>
+#include "mediapipe/examples/desktop/auto_frame/autoframe_messages.pb.h"
 
 namespace mediapipe
 {
@@ -289,7 +290,7 @@ REGISTER_CALCULATOR(HandGestureRecognitionCalculator);
     cc->Inputs().Tag(normalizedLandmarks).Set<std::vector<mediapipe::NormalizedLandmarkList>>();
 
     RET_CHECK(cc->Outputs().HasTag(recognizedHandGestureTag));
-    cc->Outputs().Tag(recognizedHandGestureTag).Set<std::string>();
+    cc->Outputs().Tag(recognizedHandGestureTag).Set<mediapipe::CombinedDetection>();
 
     return ::mediapipe::OkStatus();
 }
@@ -304,7 +305,16 @@ REGISTER_CALCULATOR(HandGestureRecognitionCalculator);
 ::mediapipe::Status HandGestureRecognitionCalculator::Process(
     CalculatorContext *cc)
 {
-    std::string *recognized_hand_gesture;
+    //std::cout << "Inside HandGestureRecognitionCalculator" << std::endl;
+    if (cc->Inputs().HasTag(normalizedLandmarks) &&
+      cc->Inputs().Tag(normalizedLandmarks).IsEmpty()) {
+          std::cout << "Sending empty packets" << std::endl;
+          cc->Outputs()
+              .Tag(recognizedHandGestureTag)
+              .AddPacket(MakePacket<mediapipe::CombinedDetection>().At(cc->InputTimestamp()));
+    return absl::OkStatus();
+  }
+    mediapipe::CombinedDetection *recognized_hand_gesture;
 
     const auto &landmarks = cc->Inputs()
                             .Tag(normalizedLandmarks)
@@ -325,11 +335,14 @@ REGISTER_CALCULATOR(HandGestureRecognitionCalculator);
         state =  _calculate_finger_state(landmarkList, fing,&fing_diff[fing]);
         handState.push_back(state);
     }
+    std::unique_ptr<mediapipe::CombinedDetection> detection = std::make_unique<mediapipe::CombinedDetection>();
+    detection->set_type(mediapipe::CombinedDetection::GESTURE);
+    detection->set_gesture(_check_gesture(handState));
+    // std::cout << "Inside HandGestureRecognitionCalculator sending stream at " <<cc->InputTimestamp() << std::endl;
 
-    recognized_hand_gesture = new std::string(_check_gesture(handState));
     cc->Outputs()
         .Tag(recognizedHandGestureTag)
-        .Add(recognized_hand_gesture, cc->InputTimestamp());
+        .AddPacket(Adopt(detection.release()).At(cc->InputTimestamp()));
     return ::mediapipe::OkStatus();
 } // namespace mediapipe
 

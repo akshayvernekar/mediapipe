@@ -5,8 +5,8 @@
 # Images on GPU coming into and out of the graph.
 type: "AutoFrameSubgraph"
 
-input_stream: "IMAGE:throttled_input_video"
-output_stream: "IMAGE:output_video"
+input_stream: "IMAGE:input_video"
+output_stream: "DETECTION:detection_roi"
 
 # Throttles the images flowing downstream for flow control. It passes through
 # the very first incoming image unaltered, and waits for
@@ -21,16 +21,16 @@ output_stream: "IMAGE:output_video"
 # ImageTransformationCalculator may get dropped downstream if the subsequent
 # TfLiteConverterCalculator or TfLiteInferenceCalculator is still busy
 # processing previous inputs.
-# node {
-#   calculator: "FlowLimiterCalculator"
-#   input_stream: "input_video"
-#   input_stream: "FINISHED:detections"
-#   input_stream_info: {
-#     tag_index: "FINISHED"
-#     back_edge: true
-#   }
-#   output_stream: "throttled_input_video"
-# }
+node {
+  calculator: "FlowLimiterCalculator"
+  input_stream: "input_video"
+  input_stream: "FINISHED:detections"
+  input_stream_info: {
+    tag_index: "FINISHED"
+    back_edge: true
+  }
+  output_stream: "throttled_input_video"
+}
 
 
 # VIDEO_PREP: Create a low frame rate stream for feature extraction.
@@ -65,12 +65,12 @@ node {
 node {
   calculator: "PreviousLoopbackCalculator"
   input_stream: "MAIN:size"
-  input_stream: "LOOP:normalised_roi"
+  input_stream: "LOOP:detection_roi"
   input_stream_info: {
     tag_index: "LOOP"
     back_edge: true
   }
-  output_stream: "PREV_LOOP:prev_normalised_roi"
+  output_stream: "PREV_LOOP:prev_detection_roi"
 }
 
 # Subgraph that fetches rectangle faces.
@@ -78,37 +78,6 @@ node {
   calculator: "DetectionsToAutoframeROICalculator"
   input_stream: "DETECTIONS:detections"
   input_stream: "IMAGE_SIZE:size"
-  input_stream: "PREV_ROI:prev_normalised_roi"
-  output_stream: "NORM_RECT:normalised_roi"
-}
-
-
-# Subgraph that fetches rectangle faces.
-node {
-  calculator: "ImageCroppingCalculator"
-  input_stream: "NORM_RECT:normalised_roi"
-  input_stream: "IMAGE:throttled_input_video"
-  output_stream: "IMAGE:cropped_video"  
-  node_options: {
-    [type.googleapis.com/mediapipe.ImageCroppingCalculatorOptions] {
-      border_mode: BORDER_REPLICATE
-    }
-  }
-}
-
-
-# Transforms the input image on CPU to a 128x128 image. To scale the input
-# image, the scale_mode option is set to FIT to preserve the aspect ratio,
-# resulting in potential letterboxing in the transformed image.
-node: {
-  calculator: "ImageTransformationCalculator"
-  input_stream: "IMAGE:cropped_video"
-  output_stream: "IMAGE:output_video"
-  options: {
-    [mediapipe.ImageTransformationCalculatorOptions.ext] {
-      output_width: 640
-      output_height: 480
-      scale_mode: FIT
-    }
-  }
+  input_stream: "PREV_DETECTION_BBOX:prev_detection_roi"
+  output_stream: "DETECTION_BBOX:detection_roi"
 }

@@ -33,12 +33,17 @@
 #include <linux/videodev2.h>
 #include "mediapipe/util/image_frame_util.h"
 #include "mediapipe/framework/formats/yuv_image.h"
+#include "mediapipe/examples/desktop/auto_frame/autoframe_messages.pb.h"
+#include <mutex>
 // #include "mediapipe/framework/formats/detection.pb.h"
 // #include "mediapipe/framework/formats/location_data.pb.h"
 // #include "mediapipe/framework/formats/rect.pb.h"
 
 constexpr char kInputStream[] = "input_video";
 constexpr char kInputSelectStream[] = "select";
+constexpr char kInputDetectionStream[] = "prev_detection";
+
+constexpr char kOutputDetectionStream[] = "detection";
 constexpr char kOutputStream[] = "output_video";
 
 constexpr char kWindowName[] = "MediaPipe";
@@ -54,9 +59,10 @@ constexpr char kWindowName[] = "MediaPipe";
 #define DEFAULT_VIDEO_IN  "1"
 #define DEFAULT_VIDEO_OUT "/dev/video6"
 
-#define AUTO_FRAME_GRAPH    "graphs/combined_graph.pbtxt"
+#define AUTO_FRAME_GRAPH    "mediapipe/examples/desktop/auto_frame/graphs/combined_graph.pbtxt"
 #define GESTURE_RECOG_GRAPH "mediapipe/examples/desktop/auto_frame/graphs/hand_gesture_recognition_live.pbtxt"
 
+std::mutex g_prev_detection_mutex;
 
 ABSL_FLAG(std::string, input_video, "",
           "Camera input device. "
@@ -64,6 +70,25 @@ ABSL_FLAG(std::string, input_video, "",
 ABSL_FLAG(std::string, output_video, "",
           "v4l2output device "
           "If not provided, show result in a window.");
+
+mediapipe::CombinedDetection prev_detection;
+
+absl::Status detection_callback(mediapipe::Packet packet)
+{
+    // LOG(ERROR) << "Received gesture!!";
+    // auto& detection = packet.Get<mediapipe::CombinedDetection>();
+    // std::string detetction_string = detection.DebugString();
+    // LOG(ERROR) << "a<---" << detetction_string;
+
+    // g_prev_detection_mutex.lock();
+    // prev_detection = &detection;
+    
+    g_prev_detection_mutex.lock();
+    prev_detection = packet.Get<mediapipe::CombinedDetection>();
+    g_prev_detection_mutex.unlock();
+
+    return absl::OkStatus();
+}
 
 absl::Status RunMPPGraph() {
     std::string calculator_graph_config_contents;
@@ -80,21 +105,6 @@ absl::Status RunMPPGraph() {
     mediapipe::CalculatorGraph auto_frame_graph;
     MP_RETURN_IF_ERROR(auto_frame_graph.Initialize(config));
 
-    // ------------------------------------------------------------------
-
-    // MP_RETURN_IF_ERROR(mediapipe::file::GetContents(
-    //     GESTURE_RECOG_GRAPH,
-    //     &calculator_graph_config_contents));
-    // LOG(INFO) << "Get calculator gesture recognition config contents: "
-    //             << calculator_graph_config_contents;
-
-    // config = mediapipe::ParseTextProtoOrDie<mediapipe::CalculatorGraphConfig>(
-    //             calculator_graph_config_contents);
-
-    // mediapipe::CalculatorGraph gesture_recog_graph;
-    // MP_RETURN_IF_ERROR(gesture_recog_graph.Initialize(config));
-
-    // ------------------------------------------------------------------
     cv::VideoCapture capture;
     const bool load_video = !absl::GetFlag(FLAGS_input_video).empty();
     
@@ -104,7 +114,7 @@ absl::Status RunMPPGraph() {
         capture.open(absl::GetFlag(FLAGS_input_video));
     } else 
     {
-        capture.open(1);
+        capture.open(0);
     }
 
     RET_CHECK(capture.isOpened());
@@ -118,7 +128,7 @@ absl::Status RunMPPGraph() {
 
     // ----------------------------------v4l2 related code
     // const bool write_to_v4l2 = !absl::GetFlag(FLAGS_output_video).empty();
-    const bool write_to_v4l2 = true;
+    const bool write_to_v4l2 = false;
     int output;
     //size_t framesize = VID_WIDTH * VID_HEIGHT * 3;  
     size_t framesize = VID_HEIGHT * VID_WIDTH * 2 ;
@@ -175,19 +185,46 @@ absl::Status RunMPPGraph() {
     LOG(INFO) << "Start running the calculator auto_frame_graph.";
     ASSIGN_OR_RETURN(mediapipe::OutputStreamPoller poller,
                     auto_frame_graph.AddOutputStreamPoller(kOutputStream));
+
+    auto_frame_graph.ObserveOutputStream(kOutputDetectionStream, detection_callback);
     MP_RETURN_IF_ERROR(auto_frame_graph.StartRun({}));
-
-
-
-    // LOG(INFO) << "Start running the calculator roi_graph.";
-    // ASSIGN_OR_RETURN(mediapipe::OutputStreamPoller roi_poller,
-    //                 roi_to_image_graph.AddOutputStreamPoller(kRoi2Image_OutputStream));
-    // MP_RETURN_IF_ERROR(roi_to_image_graph.StartRun({}));
-
 
     LOG(INFO) << "Start grabbing and processing frames.";
     bool grab_frames = true;
+    
+    // this option signifies selection choice . autoframe = 0, gesture recog = 1
+    int select = 1;
+
+    // auto dummy_detection = std::make_unique<mediapipe::CombinedDetection>();
+    // dummy_detection->set_type(mediapipe::CombinedDetection::BBOX);
+
+    // auto bbox = std::make_unique<mediapipe::Rect>();
+    // bbox->set_height(VID_HEIGHT);
+    // bbox->set_width(VID_WIDTH);
+    // bbox->set_x_center(VID_WIDTH/2);
+    // bbox->set_y_center(VID_HEIGHT/2);
+    // dummy_detection->set_allocated_bbox(bbox.get());
+
+    g_prev_detection_mutex.lock();
+    prev_detection.set_type(mediapipe::CombinedDetection::NONE);
+    g_prev_detection_mutex.unlock();
+    // prev_detection->set_type(mediapipe::CombinedDetection::NONE);
+
+
     while (grab_frames) {
+
+        // std::cout << "Creating dummy 1 frame" << std::endl;
+        // auto dummy_detection = std::make_unique<mediapipe::CombinedDetection>();
+        // dummy_detection->set_type(mediapipe::CombinedDetection::BBOX);
+
+        // auto bbox = std::make_unique<mediapipe::Rect>();
+        // bbox->set_height(VID_HEIGHT);
+        // bbox->set_width(VID_WIDTH);
+        // bbox->set_x_center(VID_WIDTH/2);
+        // bbox->set_y_center(VID_HEIGHT/2);
+        // dummy_detection->set_allocated_bbox(bbox.get());
+        // std::cout << "Creating dummy 2 " << std::endl;
+
         // Capture opencv camera or video frame.
         cv::Mat camera_frame_raw;
         capture >> camera_frame_raw;
@@ -203,44 +240,38 @@ absl::Status RunMPPGraph() {
         auto input_frame1 = absl::make_unique<mediapipe::ImageFrame>(
             mediapipe::ImageFormat::SRGB, camera_frame.cols, camera_frame.rows,
             mediapipe::ImageFrame::kDefaultAlignmentBoundary);
-        // auto input_frame2 = absl::make_unique<mediapipe::ImageFrame>(
-        //     mediapipe::ImageFormat::SRGB, camera_frame.cols, camera_frame.rows,
-        //     mediapipe::ImageFrame::kDefaultAlignmentBoundary);
         cv::Mat input_frame_mat = mediapipe::formats::MatView(input_frame1.get());
         camera_frame.copyTo(input_frame_mat);
 
-        // cv::Mat input_frame_mat2 = mediapipe::formats::MatView(input_frame2.get());
-        // camera_frame.copyTo(input_frame_mat2);
-        // Send image packet into the auto_frame_graph.
         size_t frame_timestamp_us =
             (double)cv::getTickCount() / (double)cv::getTickFrequency() * 1e6;
+
         MP_RETURN_IF_ERROR(auto_frame_graph.AddPacketToInputStream(
             kInputStream, mediapipe::Adopt(input_frame1.release())
                             .At(mediapipe::Timestamp(frame_timestamp_us))));
-        MP_RETURN_IF_ERROR(auto_frame_graph.AddPacketToInputStream(
-            kInputSelectStream, mediapipe::MakePacket<int>(1)
+
+        g_prev_detection_mutex.lock();
+        // if ( prev_detection == NULL)
+        // {
+        //     MP_RETURN_IF_ERROR(auto_frame_graph.AddPacketToInputStream(
+        //     kInputDetectionStream, mediapipe::MakePacket<mediapipe::CombinedDetection>().At(mediapipe::Timestamp(frame_timestamp_us)))); 
+        // }
+        // else
+        {
+            MP_RETURN_IF_ERROR(auto_frame_graph.AddPacketToInputStream(
+                kInputDetectionStream, mediapipe::MakePacket<mediapipe::CombinedDetection>(prev_detection)
                             .At(mediapipe::Timestamp(frame_timestamp_us))));
-        // Get the auto_frame_graph result packet, or stop if that fails.
+        }
+        g_prev_detection_mutex.unlock();
+
+
+        MP_RETURN_IF_ERROR(auto_frame_graph.AddPacketToInputStream(
+            kInputSelectStream, mediapipe::MakePacket<int>(0)
+                            .At(mediapipe::Timestamp(frame_timestamp_us))));
+
+        // // Get the auto_frame_graph result packet, or stop if that fails.
         mediapipe::Packet packet;
         if (!poller.Next(&packet)) break;
-        // auto& normalised_roi = packet.Get<mediapipe::NormalizedRect>();
-        // ------------------------------------------------------------
-        // MP_RETURN_IF_ERROR(roi_to_image_graph.AddPacketToInputStream(
-        //     kRoi2Image_InputStream_img, mediapipe::Adopt(input_frame2.release())
-        //                     .At(mediapipe::Timestamp(frame_timestamp_us))));
-
-        // mediapipe::Packet roi_in_packet = mediapipe::MakePacket<mediapipe::NormalizedRect>(normalised_roi);
-        // MP_RETURN_IF_ERROR(roi_to_image_graph.AddPacketToInputStream(
-        //     kRoi2Image_InputStream_roi, roi_in_packet.At(mediapipe::Timestamp(frame_timestamp_us))));
-        // // Get the auto_frame_graph result packet, or stop if that fails.
-        // mediapipe::Packet roi_packet;
-        // if (!roi_poller.Next(&roi_packet)) 
-        //         break;
-        
-
-        // ------------------------------------------------------------
-        // auto& normalised_roi2 = roi_in_packet.Get<mediapipe::NormalizedRect>();
-        // LOG(ERROR) << "ROI2 : " <<normalised_roi2.x_center() << "\t" << normalised_roi2.y_center() << "\t" << normalised_roi2.width() << "\t" << normalised_roi2.height() << std::endl;
         auto& output_frame = packet.Get<mediapipe::ImageFrame>();
 
         // Convert back to opencv for display or saving.
@@ -259,6 +290,7 @@ absl::Status RunMPPGraph() {
                 continue;
             }
         }else{
+
             cv::cvtColor(output_frame_mat, output_frame_mat, cv::COLOR_RGB2BGR);
             cv::imshow(kWindowName, output_frame_mat);
             // Press any key to exit.
@@ -272,8 +304,6 @@ absl::Status RunMPPGraph() {
 
     LOG(INFO) << "Shutting down.";
     MP_RETURN_IF_ERROR(auto_frame_graph.CloseInputStream(kInputStream));
-    // MP_RETURN_IF_ERROR(roi_to_image_graph.CloseInputStream(kRoi2Image_InputStream_img));
-    // MP_RETURN_IF_ERROR(roi_to_image_graph.CloseInputStream(kRoi2Image_InputStream_roi));
     return auto_frame_graph.WaitUntilDone();
 }
 

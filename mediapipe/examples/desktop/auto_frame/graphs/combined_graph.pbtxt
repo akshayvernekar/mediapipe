@@ -5,6 +5,8 @@
 # Images on GPU coming into and out of the graph.
 input_stream: "input_video"
 input_stream: "select"
+input_stream: "prev_detection"
+output_stream: "detection"
 output_stream: "output_video"
 
 # VIDEO_PREP: Create a low frame rate stream for feature extraction.
@@ -19,22 +21,36 @@ node {
 node {
   calculator: "AutoFrameSubgraph"
   input_stream: "IMAGE:input_one"
-  output_stream: "IMAGE:output_one"
+  output_stream: "DETECTION:autoframe_detection"
 }
 
 node {
   calculator: "HandGestureRecognitionSubgraph"
   input_stream: "IMAGE:input_two"
-  output_stream: "IMAGE:output_two"
+  output_stream: "DETECTION:gesture_detection"
+}
+
+# node {
+#   calculator: "MuxCalculator"
+#   input_stream: "INPUT:0:autoframe_detection"
+#   input_stream: "INPUT:1:gesture_detection"
+#   input_stream: "SELECT:select"
+#   output_stream: "OUTPUT:detection"
+# }
+
+node {
+  calculator: "ImmediateMuxCalculator"
+  input_stream: "autoframe_detection"
+  input_stream: "gesture_detection"
+  output_stream: "detection"
+  input_stream_handler {
+    input_stream_handler: "ImmediateInputStreamHandler"
+  }
 }
 
 node {
-  calculator: "MuxCalculator"
-  input_stream: "INPUT:0:output_one"
-  input_stream: "INPUT:1:output_two"
-  input_stream: "SELECT:select"
-  output_stream: "OUTPUT:output_video"
-  input_stream_handler: {
-    input_stream_handler: "MuxInputStreamHandler",
-  }
+  calculator: "DetectionsToImageframeCalculator"
+  input_stream: "IMAGE:input_video"
+  input_stream: "DETECTION:prev_detection"
+  output_stream: "IMAGE:output_video"
 }

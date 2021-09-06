@@ -23,6 +23,8 @@
 #include "mediapipe/framework/formats/rect.pb.h"
 #include "mediapipe/framework/port/ret_check.h"
 #include "mediapipe/framework/port/status.h"
+#include "mediapipe/examples/desktop/auto_frame/autoframe_messages.pb.h"
+
 namespace mediapipe {
 
 namespace {
@@ -30,10 +32,10 @@ namespace {
 // inputs
 constexpr char kDetectionsTag[] = "DETECTIONS";
 constexpr char kImageSizeTag[] = "IMAGE_SIZE";
-constexpr char kPrevROITag[] = "PREV_ROI";
+constexpr char kPrevBBOXTag[] = "PREV_DETECTION_BBOX";
 
 //outputs
-constexpr char kNormRectTag[] = "NORM_RECT";
+constexpr char kOutputBBOXTag[] = "DETECTION_BBOX";
 
 constexpr float kMinFloat = std::numeric_limits<float>::lowest();
 constexpr float kMaxFloat = std::numeric_limits<float>::max();
@@ -104,7 +106,7 @@ class DetectionsToAutoframeROICalculator : public CalculatorBase {
   int32 get_Euclidean_DistanceAB(int32 a_x, int32 a_y, int32 b_x, int32 b_y);
   virtual absl::Status DetectionToNormalizedRect(
       const std::vector<::mediapipe::Detection>& detection,
-      const DetectionSpec& detection_spec,::mediapipe::NormalizedRect* prev_roi, ::mediapipe::NormalizedRect* roi);
+      const DetectionSpec& detection_spec,const ::mediapipe::Rect* prev_roi, ::mediapipe::Rect* roi);
   virtual DetectionSpec GetDetectionSpec(const CalculatorContext* cc);
 
   static inline float NormalizeRadians(float angle) {
@@ -125,13 +127,13 @@ int32 DetectionsToAutoframeROICalculator::get_Euclidean_DistanceAB(int32 a_x, in
 
 absl::Status DetectionsToAutoframeROICalculator::DetectionToNormalizedRect(
     const std::vector<Detection>& detections, const DetectionSpec& detection_spec,
-    NormalizedRect* prev_roi, NormalizedRect* roi) {
+    const Rect* prev_roi, Rect* roi) {
         LocationData_RelativeBoundingBox faceUnionBBox;
         if (!detections.empty())
         {   
             RET_CHECK(detections[0].location_data().format() == LocationData::RELATIVE_BOUNDING_BOX)
             << "Only Detection with formats of RELATIVE_BOUNDING_BOX can be "
-                "converted to NormalizedRect";
+                "converted to Rect";
 
             // assign the first element as default element
             faceUnionBBox = detections[0].location_data().relative_bounding_box();
@@ -227,8 +229,8 @@ absl::Status DetectionsToAutoframeROICalculator::DetectionToNormalizedRect(
 
             if(prev_roi != NULL)
             {
-                int32 prev_roi_xcen = prev_roi->x_center() * frame_width;
-                int32 prev_roi_ycen = prev_roi->y_center() * frame_height;
+                int32 prev_roi_xcen = prev_roi->x_center();
+                int32 prev_roi_ycen = prev_roi->y_center();
 
                 int32 dist = get_Euclidean_DistanceAB(prev_roi_xcen, prev_roi_ycen, (_roi_X1 + _roi_width/2), (_roi_Y1 + _roi_height / 2));
                 if(dist < 20)
@@ -239,10 +241,10 @@ absl::Status DetectionsToAutoframeROICalculator::DetectionToNormalizedRect(
                 // LOG(ERROR) << "Distance between prev and current ROI : "<< dist;
             }
             
-            roi->set_x_center((_roi_X1 + _roi_width / 2)/float(frame_width));
-            roi->set_y_center((_roi_Y1 + _roi_height / 2)/float(frame_height));
-            roi->set_width(_roi_width/float(frame_width));
-            roi->set_height(_roi_height/float(frame_height));
+            roi->set_x_center(_roi_X1 + _roi_width / 2);
+            roi->set_y_center(_roi_Y1 + _roi_height / 2);
+            roi->set_width(_roi_width);
+            roi->set_height(_roi_height);
 
             std::cout << "RECT : " <<roi->x_center() << "\t" << roi->y_center() << "\t" << roi->width() << "\t" << roi->height() << std::endl;
         }
@@ -254,7 +256,7 @@ absl::Status DetectionsToAutoframeROICalculator::GetContract(CalculatorContract*
   RET_CHECK(cc->Inputs().HasTag(kDetectionsTag))
       << "Exactly one of DETECTION or DETECTIONS input stream should be "
          "provided.";
-  RET_CHECK_EQ(( cc->Outputs().HasTag(kNormRectTag) ? 1 : 0) ,1)
+  RET_CHECK_EQ(( cc->Outputs().HasTag(kOutputBBOXTag) ? 1 : 0) ,1)
       << "Exactly one of NORM_RECT, RECT, NORM_RECTS or RECTS output stream "
          "should be provided.";
 
@@ -262,15 +264,16 @@ absl::Status DetectionsToAutoframeROICalculator::GetContract(CalculatorContract*
     cc->Inputs().Tag(kDetectionsTag).Set<std::vector<Detection>>();
   }
 
-  if (cc->Inputs().HasTag(kPrevROITag)) {
-    cc->Inputs().Tag(kPrevROITag).Set<NormalizedRect>();
+  if (cc->Inputs().HasTag(kPrevBBOXTag)) {
+    cc->Inputs().Tag(kPrevBBOXTag).Set<mediapipe::CombinedDetection>();
   }
-
-  if (cc->Outputs().HasTag(kNormRectTag)) {
-    cc->Outputs().Tag(kNormRectTag).Set<NormalizedRect>();
-  }
+  
   if (cc->Inputs().HasTag(kImageSizeTag)) {
     cc->Inputs().Tag(kImageSizeTag).Set<std::pair<int, int>>();
+  }
+
+  if (cc->Outputs().HasTag(kOutputBBOXTag)) {
+    cc->Outputs().Tag(kOutputBBOXTag).Set<mediapipe::CombinedDetection>();
   }
 
   return absl::OkStatus();
@@ -287,8 +290,8 @@ absl::Status DetectionsToAutoframeROICalculator::Process(CalculatorContext* cc) 
   if (cc->Inputs().HasTag(kDetectionsTag) &&
       cc->Inputs().Tag(kDetectionsTag).IsEmpty()) {
           cc->Outputs()
-              .Tag(kNormRectTag)
-              .AddPacket(MakePacket<NormalizedRect>().At(cc->InputTimestamp()));
+              .Tag(kOutputBBOXTag)
+              .AddPacket(MakePacket<mediapipe::CombinedDetection>().At(cc->InputTimestamp()));
     return absl::OkStatus();
   }
 
@@ -298,10 +301,10 @@ absl::Status DetectionsToAutoframeROICalculator::Process(CalculatorContext* cc) 
 
     if (detections.empty()) {
       if (hasProduceEmptyPacket) {
-        if (cc->Outputs().HasTag(kNormRectTag)) {
+        if (cc->Outputs().HasTag(kOutputBBOXTag)) {
           cc->Outputs()
-              .Tag(kNormRectTag)
-              .AddPacket(MakePacket<NormalizedRect>().At(cc->InputTimestamp()));
+              .Tag(kOutputBBOXTag)
+              .AddPacket(MakePacket<mediapipe::CombinedDetection>().At(cc->InputTimestamp()));
         }
       }
       return absl::OkStatus();
@@ -311,30 +314,34 @@ absl::Status DetectionsToAutoframeROICalculator::Process(CalculatorContext* cc) 
   // Get dynamic calculator options (e.g. `image_size`).
   const DetectionSpec detection_spec = GetDetectionSpec(cc);
 
-  if (cc->Outputs().HasTag(kNormRectTag)) {
+  if (cc->Outputs().HasTag(kOutputBBOXTag)) {
 
+    auto output_rect = absl::make_unique<Rect>();
 
-    auto output_rect = absl::make_unique<NormalizedRect>();
-
-    if (!cc->Inputs().Tag(kPrevROITag).IsEmpty())
+    if (!cc->Inputs().Tag(kPrevBBOXTag).IsEmpty())
     {
-      auto prevROI = cc->Inputs().Tag(kPrevROITag).Get<NormalizedRect>();
-      MP_RETURN_IF_ERROR(DetectionToNormalizedRect(detections, detection_spec, &prevROI,
-                                                 output_rect.get()));
+      auto prevBbox = cc->Inputs().Tag(kPrevBBOXTag).Get<mediapipe::CombinedDetection>();
+      if (prevBbox.has_bbox())
+      {
+        MP_RETURN_IF_ERROR(DetectionToNormalizedRect(detections, detection_spec, &prevBbox.bbox() ,
+                                                output_rect.get()));
+
+      }
       // LOG(ERROR) << "RECT : " <<prevROI.x_center() << "\t" << prevROI.y_center() << "\t" << prevROI.width() << "\t" << prevROI.height();
     }
     else
     {
-      MP_RETURN_IF_ERROR(DetectionToNormalizedRect(detections, detection_spec, NULL,
-                                                 output_rect.get()));
-
+      MP_RETURN_IF_ERROR(DetectionToNormalizedRect(detections, detection_spec, NULL, output_rect.get()));
     }
-    
-    cc->Outputs()
-        .Tag(kNormRectTag)
-        .Add(output_rect.release(), cc->InputTimestamp());
-  }
 
+    std::unique_ptr<mediapipe::CombinedDetection> detection = std::make_unique<mediapipe::CombinedDetection>();
+    detection->set_type(mediapipe::CombinedDetection::BBOX);
+    detection->set_allocated_bbox(output_rect.release());
+
+    cc->Outputs()
+        .Tag(kOutputBBOXTag)
+        .Add(detection.release(), cc->InputTimestamp());
+  }
 
   return absl::OkStatus();
 }

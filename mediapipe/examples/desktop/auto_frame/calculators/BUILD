@@ -24,6 +24,7 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":detections_to_autoframe_roi_calculator_cc_proto",
+        "//mediapipe/examples/desktop/auto_frame:autoframe_messages_cc_proto",
         "//mediapipe/framework:calculator_framework",
         "//mediapipe/framework:calculator_options_cc_proto",
         "//mediapipe/framework/formats:detection_cc_proto",
@@ -42,6 +43,7 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "//mediapipe/framework:calculator_framework",
+        "//mediapipe/examples/desktop/auto_frame:autoframe_messages_cc_proto",
         "//mediapipe/framework/formats:landmark_cc_proto",
         "//mediapipe/framework/port:status",
         "//mediapipe/framework/formats:rect_cc_proto",
@@ -65,6 +67,21 @@ cc_library(
     alwayslink = 1,
 )
 
+cc_library(
+    name = "detections_to_imageframe_calculator",
+    srcs = ["detections_to_imageframe_calculator.cc"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//mediapipe/framework:calculator_framework",
+        "//mediapipe/examples/desktop/auto_frame:autoframe_messages_cc_proto",
+        "//mediapipe/framework/formats:image_frame_opencv",
+        "//mediapipe/framework/port:opencv_imgcodecs",
+        "//mediapipe/framework/port:opencv_imgproc",
+        "//mediapipe/framework/port:opencv_highgui",
+        "//mediapipe/framework/port:status",
+    ],
+    alwayslink = 1,
+)
 
 cc_library(
     name = "demux_calculator",

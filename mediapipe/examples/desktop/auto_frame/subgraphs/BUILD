@@ -58,6 +58,7 @@ mediapipe_simple_subgraph(
         "//mediapipe/graphs/face_detection:desktop_live_calculators",
         "//mediapipe/calculators/core:previous_loopback_calculator",
         "//mediapipe/calculators/core:packet_thinner_calculator",
+        "//mediapipe/examples/desktop/auto_frame/calculators:detections_to_imageframe_calculator",
     ],
 )
 
