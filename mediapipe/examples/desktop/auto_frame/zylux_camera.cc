@@ -19,7 +19,6 @@
 #include "absl/flags/parse.h"
 #include "mediapipe/framework/calculator_framework.h"
 #include "mediapipe/framework/formats/image_frame.h"
-// #include "mediapipe/util/image_frame_util.h"
 #include "mediapipe/framework/formats/image_frame_opencv.h"
 #include "mediapipe/framework/port/file_helpers.h"
 #include "mediapipe/framework/port/opencv_highgui_inc.h"
@@ -33,18 +32,18 @@
 #include <linux/videodev2.h>
 #include "mediapipe/util/image_frame_util.h"
 #include "mediapipe/framework/formats/yuv_image.h"
+#include "mediapipe/framework/formats/detection.pb.h"
+#include "mediapipe/framework/formats/location_data.pb.h"
+#include "mediapipe/framework/formats/rect.pb.h"
 #include "mediapipe/examples/desktop/auto_frame/autoframe_messages.pb.h"
-#include <mutex>
-// #include "mediapipe/framework/formats/detection.pb.h"
-// #include "mediapipe/framework/formats/location_data.pb.h"
-// #include "mediapipe/framework/formats/rect.pb.h"
+#include <chrono>
+// #include "mediapipe/examples/desktop/auto_frame/autoframe_messages.pb.h"
 
 constexpr char kInputStream[] = "input_video";
 constexpr char kInputSelectStream[] = "select";
 constexpr char kInputDetectionStream[] = "prev_detection";
-
-constexpr char kOutputDetectionStream[] = "detection";
 constexpr char kOutputStream[] = "output_video";
+constexpr char kOutputStream_Roi[] = "curr_detection";
 
 constexpr char kWindowName[] = "MediaPipe";
 
@@ -56,13 +55,14 @@ constexpr char kWindowName[] = "MediaPipe";
 #define VID_HEIGHT 480
 #endif
 
-#define DEFAULT_VIDEO_IN  "1"
+#define DEFAULT_VIDEO_IN  1
 #define DEFAULT_VIDEO_OUT "/dev/video6"
 
 #define AUTO_FRAME_GRAPH    "mediapipe/examples/desktop/auto_frame/graphs/combined_graph.pbtxt"
-#define GESTURE_RECOG_GRAPH "mediapipe/examples/desktop/auto_frame/graphs/hand_gesture_recognition_live.pbtxt"
 
-std::mutex g_prev_detection_mutex;
+
+// std::string prev_gesture;
+mediapipe::CombinedDetection prev_gesture;
 
 ABSL_FLAG(std::string, input_video, "",
           "Camera input device. "
@@ -71,24 +71,13 @@ ABSL_FLAG(std::string, output_video, "",
           "v4l2output device "
           "If not provided, show result in a window.");
 
-mediapipe::CombinedDetection prev_detection;
-
-absl::Status detection_callback(mediapipe::Packet packet)
+absl::Status roi_callback(mediapipe::Packet packet)
 {
     // LOG(ERROR) << "Received gesture!!";
-    // auto& detection = packet.Get<mediapipe::CombinedDetection>();
-    // std::string detetction_string = detection.DebugString();
-    // LOG(ERROR) << "a<---" << detetction_string;
-
-    // g_prev_detection_mutex.lock();
-    // prev_detection = &detection;
-    
-    g_prev_detection_mutex.lock();
-    prev_detection = packet.Get<mediapipe::CombinedDetection>();
-    g_prev_detection_mutex.unlock();
-
+    prev_gesture = packet.Get<mediapipe::CombinedDetection>();
     return absl::OkStatus();
 }
+
 
 absl::Status RunMPPGraph() {
     std::string calculator_graph_config_contents;
@@ -114,11 +103,10 @@ absl::Status RunMPPGraph() {
         capture.open(absl::GetFlag(FLAGS_input_video));
     } else 
     {
-        capture.open(0);
+        capture.open(DEFAULT_VIDEO_IN);
     }
 
     RET_CHECK(capture.isOpened());
-
     
 #if (CV_MAJOR_VERSION >= 3) && (CV_MINOR_VERSION >= 2)
     capture.set(cv::CAP_PROP_FRAME_WIDTH, 640);
@@ -127,17 +115,17 @@ absl::Status RunMPPGraph() {
 #endif
 
     // ----------------------------------v4l2 related code
-    // const bool write_to_v4l2 = !absl::GetFlag(FLAGS_output_video).empty();
-    const bool write_to_v4l2 = false;
+    const bool write_to_v4l2 = !absl::GetFlag(FLAGS_output_video).empty();
+
     int output;
-    //size_t framesize = VID_WIDTH * VID_HEIGHT * 3;  
-    size_t framesize = VID_HEIGHT * VID_WIDTH * 2 ;
+    // size_t framesize = VID_WIDTH * VID_HEIGHT * 3/2;  
+    size_t framesize = VID_WIDTH * VID_HEIGHT * 2;  
+    auto start = std::chrono::high_resolution_clock::now();
     
     if(write_to_v4l2)
     {
         // open output device
-        // output = open(absl::GetFlag(FLAGS_output_video).c_str(), O_RDWR);
-        output = open(DEFAULT_VIDEO_OUT, O_RDWR);
+        output = open(absl::GetFlag(FLAGS_output_video).c_str(), O_RDWR);
         if(output < 0) {
             std::cerr << "ERROR: could not open output device!\n" << strerror(errno);
             return absl::InvalidArgumentError("Invalid output device");
@@ -166,8 +154,9 @@ absl::Status RunMPPGraph() {
         // - V4L2_PIX_FMT_MJPEG,
         // - V4L2_PIX_FMT_JPEG
         // vid_format.fmt.pix.pixelformat = V4L2_PIX_FMT_RGB24;
-        vid_format.fmt.pix.pixelformat = V4L2_PIX_FMT_YUYV;
+         vid_format.fmt.pix.pixelformat = V4L2_PIX_FMT_YUYV;
         // vid_format.fmt.pix.pixelformat = V4L2_PIX_FMT_YUV420;
+
         vid_format.fmt.pix.sizeimage = framesize;
         vid_format.fmt.pix.field = V4L2_FIELD_NONE;
         vid_format.fmt.pix.colorspace = V4L2_COLORSPACE_SRGB;
@@ -183,48 +172,18 @@ absl::Status RunMPPGraph() {
     }
 
     LOG(INFO) << "Start running the calculator auto_frame_graph.";
-    ASSIGN_OR_RETURN(mediapipe::OutputStreamPoller poller,
+    ASSIGN_OR_RETURN(mediapipe::OutputStreamPoller poller1,
                     auto_frame_graph.AddOutputStreamPoller(kOutputStream));
 
-    auto_frame_graph.ObserveOutputStream(kOutputDetectionStream, detection_callback);
+    auto_frame_graph.ObserveOutputStream(kOutputStream_Roi, roi_callback);
     MP_RETURN_IF_ERROR(auto_frame_graph.StartRun({}));
 
     LOG(INFO) << "Start grabbing and processing frames.";
     bool grab_frames = true;
-    
-    // this option signifies selection choice . autoframe = 0, gesture recog = 1
-    int select = 1;
-
-    // auto dummy_detection = std::make_unique<mediapipe::CombinedDetection>();
-    // dummy_detection->set_type(mediapipe::CombinedDetection::BBOX);
-
-    // auto bbox = std::make_unique<mediapipe::Rect>();
-    // bbox->set_height(VID_HEIGHT);
-    // bbox->set_width(VID_WIDTH);
-    // bbox->set_x_center(VID_WIDTH/2);
-    // bbox->set_y_center(VID_HEIGHT/2);
-    // dummy_detection->set_allocated_bbox(bbox.get());
-
-    g_prev_detection_mutex.lock();
-    prev_detection.set_type(mediapipe::CombinedDetection::NONE);
-    g_prev_detection_mutex.unlock();
-    // prev_detection->set_type(mediapipe::CombinedDetection::NONE);
-
 
     while (grab_frames) {
 
-        // std::cout << "Creating dummy 1 frame" << std::endl;
-        // auto dummy_detection = std::make_unique<mediapipe::CombinedDetection>();
-        // dummy_detection->set_type(mediapipe::CombinedDetection::BBOX);
-
-        // auto bbox = std::make_unique<mediapipe::Rect>();
-        // bbox->set_height(VID_HEIGHT);
-        // bbox->set_width(VID_WIDTH);
-        // bbox->set_x_center(VID_WIDTH/2);
-        // bbox->set_y_center(VID_HEIGHT/2);
-        // dummy_detection->set_allocated_bbox(bbox.get());
-        // std::cout << "Creating dummy 2 " << std::endl;
-
+        auto start = std::chrono::high_resolution_clock::now();
         // Capture opencv camera or video frame.
         cv::Mat camera_frame_raw;
         capture >> camera_frame_raw;
@@ -240,57 +199,76 @@ absl::Status RunMPPGraph() {
         auto input_frame1 = absl::make_unique<mediapipe::ImageFrame>(
             mediapipe::ImageFormat::SRGB, camera_frame.cols, camera_frame.rows,
             mediapipe::ImageFrame::kDefaultAlignmentBoundary);
+
         cv::Mat input_frame_mat = mediapipe::formats::MatView(input_frame1.get());
         camera_frame.copyTo(input_frame_mat);
 
         size_t frame_timestamp_us =
             (double)cv::getTickCount() / (double)cv::getTickFrequency() * 1e6;
-
         MP_RETURN_IF_ERROR(auto_frame_graph.AddPacketToInputStream(
             kInputStream, mediapipe::Adopt(input_frame1.release())
                             .At(mediapipe::Timestamp(frame_timestamp_us))));
 
-        g_prev_detection_mutex.lock();
-        // if ( prev_detection == NULL)
-        // {
-        //     MP_RETURN_IF_ERROR(auto_frame_graph.AddPacketToInputStream(
-        //     kInputDetectionStream, mediapipe::MakePacket<mediapipe::CombinedDetection>().At(mediapipe::Timestamp(frame_timestamp_us)))); 
-        // }
-        // else
-        {
-            MP_RETURN_IF_ERROR(auto_frame_graph.AddPacketToInputStream(
-                kInputDetectionStream, mediapipe::MakePacket<mediapipe::CombinedDetection>(prev_detection)
+        MP_RETURN_IF_ERROR(auto_frame_graph.AddPacketToInputStream(
+            kInputSelectStream, mediapipe::MakePacket<int>(1)
                             .At(mediapipe::Timestamp(frame_timestamp_us))));
-        }
-        g_prev_detection_mutex.unlock();
-
 
         MP_RETURN_IF_ERROR(auto_frame_graph.AddPacketToInputStream(
-            kInputSelectStream, mediapipe::MakePacket<int>(0)
+            kInputDetectionStream, mediapipe::MakePacket<mediapipe::CombinedDetection>(prev_gesture)
                             .At(mediapipe::Timestamp(frame_timestamp_us))));
 
-        // // Get the auto_frame_graph result packet, or stop if that fails.
+        // Get the auto_frame_graph result packet, or stop if that fails.
         mediapipe::Packet packet;
-        if (!poller.Next(&packet)) break;
+        if (!poller1.Next(&packet)) break;
+
         auto& output_frame = packet.Get<mediapipe::ImageFrame>();
+
+        auto stop = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
+        LOG(ERROR) << "time taken to get Frame: " << duration.count();
 
         // Convert back to opencv for display or saving.
         cv::Mat output_frame_mat = mediapipe::formats::MatView(&output_frame);
-
+        static int once = 0;
         if(write_to_v4l2)
         {
             mediapipe::YUVImage yuv_image;
             mediapipe::image_frame_util::ImageFrameToYUV2Image(output_frame, &yuv_image);
             // write frames to v4l2 loopback device
             int written = write(output, yuv_image.data(0), framesize);
-            // LOG(ERROR) << "written bytes : "<< written << " , framesize : "<< framesize;
+
+            // int written = write(output, output_frame_mat.data, framesize);
+            LOG(ERROR) << "written bytes : "<< written;
             if (written < 0) {
-                LOG(ERROR) << "ERROR: could not write to output device!\n";
-                // close(output);
-                continue;
+                std::cerr << "ERROR: could not write to output device!\n";
+                close(output);
+                break;
+            }
+
+            if(once == 0)
+            {
+                int fd = open("i420image.yuv",O_CREAT | O_WRONLY);
+                int size = yuv_image.width() * yuv_image.height() * 1.5;
+                if(fd)
+                {
+                    written = write(fd, yuv_image.data(0), size);
+                    LOG(ERROR) << "Wrote file i420image.yuv: "<< written;
+                    close(fd);
+                }
+
+                mediapipe::YUVImage yuv_image2;
+                mediapipe::image_frame_util::ImageFrameToYUV2Image(output_frame, &yuv_image2);
+                size = yuv_image2.width() * yuv_image2.height() * 2;
+                fd = open("yuy2image.yuv",O_CREAT | O_WRONLY);
+                if(fd)
+                {
+                    written = write(fd, yuv_image2.data(0), size);
+                    LOG(ERROR) << "Wrote file yuy2image.yuv: "<< written;
+                    close(fd);
+                }
+                once += 1;
             }
         }else{
-
             cv::cvtColor(output_frame_mat, output_frame_mat, cv::COLOR_RGB2BGR);
             cv::imshow(kWindowName, output_frame_mat);
             // Press any key to exit.
@@ -302,7 +280,7 @@ absl::Status RunMPPGraph() {
     if (output)
         close(output);
 
-    LOG(INFO) << "Shutting down.";
+    LOG(ERROR) << "Shutting down.";
     MP_RETURN_IF_ERROR(auto_frame_graph.CloseInputStream(kInputStream));
     return auto_frame_graph.WaitUntilDone();
 }

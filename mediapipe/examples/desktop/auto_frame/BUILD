@@ -47,7 +47,6 @@ cc_binary(
         "//mediapipe/framework/formats:image_frame",        
         "//mediapipe/framework/formats:yuv_image", 
         "//mediapipe/util:image_frame_util",    
-        "//mediapipe/framework/formats:image_frame_opencv",
         "//mediapipe/framework/port:file_helpers",
         "//mediapipe/framework/port:opencv_highgui",
         "//mediapipe/framework/port:opencv_imgproc",
@@ -60,5 +59,6 @@ cc_binary(
         "//mediapipe/examples/desktop/auto_frame/subgraphs:auto_frame_graph",
         "//mediapipe/examples/desktop/auto_frame/subgraphs:hand_gesture_recognition_live",
         "//mediapipe/framework/stream_handler:sync_set_input_stream_handler",
+        "//mediapipe/examples/desktop/auto_frame/calculators:detections_to_imageframe_calculator",
     ],
 )

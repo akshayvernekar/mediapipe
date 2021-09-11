@@ -9,7 +9,7 @@ type: "HandGestureRecognitionSubgraph"
 input_stream: "IMAGE:input_video"
 
 # CPU image. (ImageFrame)
-output_stream: "DETECTION:detection_gesture"
+output_stream: "GESTURE:gesture"
 
 # Generates side packet cotaining max number of hands to detect/track.
 node {
@@ -49,7 +49,7 @@ node {
 # Detects/tracks hand landmarks.
 node {
   calculator: "HandLandmarkTrackingCpu"
-  input_stream: "IMAGE:input_video"
+  input_stream: "IMAGE:throttled_input_video"
   input_side_packet: "NUM_HANDS:num_hands"
   output_stream: "LANDMARKS:landmarks"
   output_stream: "HANDEDNESS:handedness"
@@ -61,7 +61,7 @@ node {
 node{
   calculator: "HandGestureRecognitionCalculator",
   input_stream: "LANDMARKS:landmarks",
-  output_stream: "RECOGNIZED_HAND_GESTURE:detection_gesture"
+  output_stream: "RECOGNIZED_HAND_GESTURE:gesture"
 }
 
 # Subgraph that renders annotations and overlays them on top of the input

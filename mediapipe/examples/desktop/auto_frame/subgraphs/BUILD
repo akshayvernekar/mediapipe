@@ -52,13 +52,11 @@ mediapipe_simple_subgraph(
     register_as = "AutoFrameSubgraph",
     deps = [
         "//mediapipe/examples/desktop/auto_frame/calculators:detections_to_autoframe_roi_calculator",
-        "//mediapipe/calculators/image:image_cropping_calculator",
         "//mediapipe/calculators/image:image_transformation_calculator",
         "//mediapipe/calculators/image:image_properties_calculator",
         "//mediapipe/graphs/face_detection:desktop_live_calculators",
         "//mediapipe/calculators/core:previous_loopback_calculator",
         "//mediapipe/calculators/core:packet_thinner_calculator",
-        "//mediapipe/examples/desktop/auto_frame/calculators:detections_to_imageframe_calculator",
     ],
 )
 
