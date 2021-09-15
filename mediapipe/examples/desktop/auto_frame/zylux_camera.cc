@@ -55,7 +55,7 @@ constexpr char kWindowName[] = "MediaPipe";
 #define VID_HEIGHT 480
 #endif
 
-#define DEFAULT_VIDEO_IN  1
+#define DEFAULT_VIDEO_IN  0
 #define DEFAULT_VIDEO_OUT "/dev/video6"
 
 #define AUTO_FRAME_GRAPH    "mediapipe/examples/desktop/auto_frame/graphs/combined_graph.pbtxt"
@@ -210,7 +210,7 @@ absl::Status RunMPPGraph() {
                             .At(mediapipe::Timestamp(frame_timestamp_us))));
 
         MP_RETURN_IF_ERROR(auto_frame_graph.AddPacketToInputStream(
-            kInputSelectStream, mediapipe::MakePacket<int>(1)
+            kInputSelectStream, mediapipe::MakePacket<mediapipe::CombinedDetection::OP_TYPE>(mediapipe::CombinedDetection::GESTURE_RECOG)
                             .At(mediapipe::Timestamp(frame_timestamp_us))));
 
         MP_RETURN_IF_ERROR(auto_frame_graph.AddPacketToInputStream(

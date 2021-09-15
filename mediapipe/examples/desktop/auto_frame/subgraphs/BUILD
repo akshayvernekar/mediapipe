@@ -55,6 +55,7 @@ mediapipe_simple_subgraph(
         "//mediapipe/calculators/image:image_transformation_calculator",
         "//mediapipe/calculators/image:image_properties_calculator",
         "//mediapipe/graphs/face_detection:desktop_live_calculators",
+        "//mediapipe/modules/face_detection:face_detection_full_range_cpu",
         "//mediapipe/calculators/core:previous_loopback_calculator",
         "//mediapipe/calculators/core:packet_thinner_calculator",
     ],

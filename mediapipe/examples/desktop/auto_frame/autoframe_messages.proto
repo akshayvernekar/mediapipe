@@ -26,6 +26,14 @@ message CombinedDetection {
         GESTURE = 2;
     }
 
+    enum OP_TYPE {
+        NOOP = 0 ;
+        AUTO_FRAME = 1;
+        GESTURE_RECOG = 2;
+        ZOOM_IN = 3;
+        ZOOM_OUT = 4;
+    }
+
     optional TYPE type = 1 [default = NONE];
     optional Rect bbox = 2;
     optional string gesture = 3;

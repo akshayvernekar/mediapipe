@@ -90,9 +90,22 @@ cc_library(
     deps = [
         "//mediapipe/framework:calculator_framework",
         "//mediapipe/framework/formats:image_frame_opencv",
+        "//mediapipe/examples/desktop/auto_frame:autoframe_messages_cc_proto",
         "//mediapipe/framework/port:opencv_imgcodecs",
         "//mediapipe/framework/port:opencv_imgproc",
         "//mediapipe/framework/port:status",
+    ],
+    alwayslink = 1,
+)
+
+cc_library(
+    name = "nooperation_calculator",
+    srcs = ["nooperation_calculator.cc"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//mediapipe/framework:calculator_framework",
+        "//mediapipe/framework/formats:image_frame_opencv",
+        "//mediapipe/examples/desktop/auto_frame:autoframe_messages_cc_proto",
     ],
     alwayslink = 1,
 )

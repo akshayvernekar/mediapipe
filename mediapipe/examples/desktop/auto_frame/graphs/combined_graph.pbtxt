@@ -14,25 +14,34 @@ node {
   calculator: "DemuxCalculator"
   input_stream: "IN_IMG:input_video"
   input_stream: "SELECT:select"
-  output_stream: "OUT_IMG0:input_one"
-  output_stream: "OUT_IMG1:input_two"
+  output_stream: "OUT_IMG0:nop_in"
+  output_stream: "OUT_IMG1:autoframe_in"
+  output_stream: "OUT_IMG2:gesture_in"
+  output_stream: "OUT_IMG3:zoomin_in"
+  output_stream: "OUT_IMG4:zoomout_in"
 }
 
+node {
+  calculator: "NoopCalculator"
+  input_stream: "IMAGE:nop_in"
+  output_stream: "DETECTION:noop_detection"
+}
 
 node {
   calculator: "AutoFrameSubgraph"
-  input_stream: "IMAGE:input_one"
+  input_stream: "IMAGE:autoframe_in"
   output_stream: "DETECTION:autoframe_detection"
 }
 
 node {
   calculator: "HandGestureRecognitionSubgraph"
-  input_stream: "IMAGE:input_two"
+  input_stream: "IMAGE:gesture_in"
   output_stream: "GESTURE:gesture_detection"
 }
 
 node {
   calculator: "ImmediateMuxCalculator"
+  input_stream: "noop_detection"
   input_stream: "gesture_detection"
   input_stream: "autoframe_detection"
   output_stream: "curr_detection"
