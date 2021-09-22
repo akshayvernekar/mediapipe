@@ -39,7 +39,7 @@ cc_library(
 
 cc_library(
     name = "hand_gesture_recognition_calculator",
-    srcs = ["hand-gesture-recognition-calculator.cc"],
+    srcs = ["hand_gesture_recognition_calculator.cc"],
     visibility = ["//visibility:public"],
     deps = [
         "//mediapipe/framework:calculator_framework",
@@ -101,6 +101,31 @@ cc_library(
 cc_library(
     name = "nooperation_calculator",
     srcs = ["nooperation_calculator.cc"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//mediapipe/framework:calculator_framework",
+        "//mediapipe/framework/formats:image_frame_opencv",
+        "//mediapipe/examples/desktop/auto_frame:autoframe_messages_cc_proto",
+    ],
+    alwayslink = 1,
+)
+
+cc_library(
+    name = "zoomin_calculator",
+    srcs = ["zoomin_calculator.cc"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//mediapipe/framework:calculator_framework",
+        "//mediapipe/framework/formats:image_frame_opencv",
+        "//mediapipe/examples/desktop/auto_frame:autoframe_messages_cc_proto",
+    ],
+    alwayslink = 1,
+)
+
+
+cc_library(
+    name = "zoomout_calculator",
+    srcs = ["zoomout_calculator.cc"],
     visibility = ["//visibility:public"],
     deps = [
         "//mediapipe/framework:calculator_framework",

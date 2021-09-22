@@ -56,6 +56,8 @@ cc_binary(
         "//mediapipe/calculators/core:mux_calculator",
         "//mediapipe/calculators/core:immediate_mux_calculator",
         "//mediapipe/examples/desktop/auto_frame/calculators:nooperation_calculator",
+        "//mediapipe/examples/desktop/auto_frame/calculators:zoomin_calculator",
+        "//mediapipe/examples/desktop/auto_frame/calculators:zoomout_calculator",
         "//mediapipe/examples/desktop/auto_frame/calculators:demux_calculator",
         "//mediapipe/examples/desktop/auto_frame/subgraphs:auto_frame_graph",
         "//mediapipe/examples/desktop/auto_frame/subgraphs:hand_gesture_recognition_live",

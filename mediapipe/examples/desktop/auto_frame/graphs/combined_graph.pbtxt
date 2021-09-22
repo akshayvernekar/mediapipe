@@ -24,12 +24,14 @@ node {
 node {
   calculator: "NoopCalculator"
   input_stream: "IMAGE:nop_in"
+  input_stream: "PREV_DETECTION:prev_detection"
   output_stream: "DETECTION:noop_detection"
 }
 
 node {
   calculator: "AutoFrameSubgraph"
   input_stream: "IMAGE:autoframe_in"
+  input_stream: "PREV_DETECTION:prev_detection"
   output_stream: "DETECTION:autoframe_detection"
 }
 
@@ -40,10 +42,26 @@ node {
 }
 
 node {
+  calculator: "ZoomInCalculator"
+  input_stream: "IMAGE:zoomin_in"
+  input_stream: "PREV_DETECTION:prev_detection"
+  output_stream: "DETECTION:zoom_in_detection"
+}
+
+node {
+  calculator: "ZoomOutCalculator"
+  input_stream: "IMAGE:zoomout_in"
+  input_stream: "PREV_DETECTION:prev_detection"
+  output_stream: "DETECTION:zoom_out_detection"
+}
+
+node {
   calculator: "ImmediateMuxCalculator"
   input_stream: "noop_detection"
   input_stream: "gesture_detection"
   input_stream: "autoframe_detection"
+  input_stream: "zoom_in_detection"
+  input_stream: "zoom_out_detection"
   output_stream: "curr_detection"
   input_stream_handler {
     input_stream_handler: "ImmediateInputStreamHandler"

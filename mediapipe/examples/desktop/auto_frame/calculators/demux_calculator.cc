@@ -12,96 +12,100 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "mediapipe/examples/desktop/auto_frame/autoframe_messages.pb.h"
 #include "mediapipe/framework/calculator_framework.h"
 #include "mediapipe/framework/formats/image_frame_opencv.h"
 #include "mediapipe/framework/port/opencv_imgproc_inc.h"
 #include "mediapipe/framework/port/status.h"
 #include "mediapipe/framework/port/status_builder.h"
-#include "mediapipe/examples/desktop/auto_frame/autoframe_messages.pb.h"
 
 namespace mediapipe {
 
-namespace {
-    // inputs
-    constexpr char kInputTag[] = "IN_IMG";
-    constexpr char kSelectTag[] = "SELECT";
+    namespace {
+        // inputs
+        constexpr char kInputTag[] = "IN_IMG";
+        constexpr char kSelectTag[] = "SELECT";
 
-    //outputs
-    constexpr char kOutput0Tag[] = "OUT_IMG0";
-    constexpr char kOutput1Tag[] = "OUT_IMG1";
-    constexpr char kOutput2Tag[] = "OUT_IMG2";
-    constexpr char kOutput3Tag[] = "OUT_IMG3";
-    constexpr char kOutput4Tag[] = "OUT_IMG4";
-} 
+        // outputs
+        constexpr char kOutput0Tag[] = "OUT_IMG0";
+        constexpr char kOutput1Tag[] = "OUT_IMG1";
+        constexpr char kOutput2Tag[] = "OUT_IMG2";
+        constexpr char kOutput3Tag[] = "OUT_IMG3";
+        constexpr char kOutput4Tag[] = "OUT_IMG4";
+    }  // namespace
 
-class DemuxCalculator : public CalculatorBase {
- public:
+    class DemuxCalculator : public CalculatorBase {
+       public:
+        static absl::Status GetContract(CalculatorContract* cc) {
+            if (cc->Inputs().HasTag(kInputTag)) {
+                cc->Inputs().Tag(kInputTag).Set<ImageFrame>();
+            }
 
-    static absl::Status GetContract(CalculatorContract* cc)
-    {
-        if (cc->Inputs().HasTag(kInputTag)) {
-            cc->Inputs().Tag(kInputTag).Set<ImageFrame>();
+            if (cc->Inputs().HasTag(kSelectTag)) {
+                cc->Inputs()
+                    .Tag(kSelectTag)
+                    .Set<mediapipe::CombinedDetection::OP_TYPE>();
+            }
+
+            if (cc->Outputs().HasTag(kOutput0Tag)) {
+                cc->Outputs().Tag(kOutput0Tag).Set<ImageFrame>();
+            }
+
+            if (cc->Outputs().HasTag(kOutput1Tag)) {
+                cc->Outputs().Tag(kOutput1Tag).Set<ImageFrame>();
+            }
+
+            if (cc->Outputs().HasTag(kOutput2Tag)) {
+                cc->Outputs().Tag(kOutput2Tag).Set<ImageFrame>();
+            }
+
+            if (cc->Outputs().HasTag(kOutput3Tag)) {
+                cc->Outputs().Tag(kOutput3Tag).Set<ImageFrame>();
+            }
+            if (cc->Outputs().HasTag(kOutput4Tag)) {
+                cc->Outputs().Tag(kOutput4Tag).Set<ImageFrame>();
+            }
+
+            return absl::OkStatus();
         }
 
-        if (cc->Inputs().HasTag(kSelectTag)) {
-            cc->Inputs().Tag(kSelectTag).Set<mediapipe::CombinedDetection::OP_TYPE>();
+        absl::Status Open(CalculatorContext* cc) override {
+            return absl::OkStatus();
         }
 
-        if (cc->Outputs().HasTag(kOutput0Tag)) {
-            cc->Outputs().Tag(kOutput0Tag).Set<ImageFrame>();
+        absl::Status Process(CalculatorContext* cc) override {
+            mediapipe::CombinedDetection::OP_TYPE sel =
+                cc->Inputs()
+                    .Tag(kSelectTag)
+                    .Get<mediapipe::CombinedDetection::OP_TYPE>();
+
+            if (sel == mediapipe::CombinedDetection::NOOP) {
+                cc->Outputs()
+                    .Tag(kOutput0Tag)
+                    .AddPacket(cc->Inputs().Tag(kInputTag).Value());
+            } else if (sel == mediapipe::CombinedDetection::AUTO_FRAME) {
+                cc->Outputs()
+                    .Tag(kOutput1Tag)
+                    .AddPacket(cc->Inputs().Tag(kInputTag).Value());
+            } else if (sel == mediapipe::CombinedDetection::GESTURE_RECOG) {
+                cc->Outputs()
+                    .Tag(kOutput2Tag)
+                    .AddPacket(cc->Inputs().Tag(kInputTag).Value());
+            } else if (sel == mediapipe::CombinedDetection::ZOOM_IN) {
+                cc->Outputs()
+                    .Tag(kOutput3Tag)
+                    .AddPacket(cc->Inputs().Tag(kInputTag).Value());
+            } else if (sel == mediapipe::CombinedDetection::ZOOM_OUT) {
+                cc->Outputs()
+                    .Tag(kOutput4Tag)
+                    .AddPacket(cc->Inputs().Tag(kInputTag).Value());
+            }
+            return absl::OkStatus();
         }
 
-        if (cc->Outputs().HasTag(kOutput1Tag)) {
-            cc->Outputs().Tag(kOutput1Tag).Set<ImageFrame>();
-        }
+       private:
+    };
 
-        if (cc->Outputs().HasTag(kOutput2Tag)) {
-            cc->Outputs().Tag(kOutput2Tag).Set<ImageFrame>();
-        }
-
-        if (cc->Outputs().HasTag(kOutput3Tag)) {
-            cc->Outputs().Tag(kOutput3Tag).Set<ImageFrame>();
-        }
-        if (cc->Outputs().HasTag(kOutput4Tag)) {
-            cc->Outputs().Tag(kOutput4Tag).Set<ImageFrame>();
-        }
-
-        return absl::OkStatus();    
-    }
-
-    absl::Status Open(CalculatorContext* cc) override {
-        return absl::OkStatus();
-    }
-
-    absl::Status Process(CalculatorContext* cc) override 
-    {
-        mediapipe::CombinedDetection::OP_TYPE sel = cc->Inputs().Tag(kSelectTag).Get<mediapipe::CombinedDetection::OP_TYPE>();
-        if(sel == mediapipe::CombinedDetection::NOOP)
-        {
-            cc->Outputs().Tag(kOutput0Tag).AddPacket(cc->Inputs().Tag(kInputTag).Value());
-        }
-        else if (sel == mediapipe::CombinedDetection::AUTO_FRAME)
-        {
-            cc->Outputs().Tag(kOutput1Tag).AddPacket(cc->Inputs().Tag(kInputTag).Value()); 
-        }
-        else if (sel == mediapipe::CombinedDetection::GESTURE_RECOG)
-        {
-            cc->Outputs().Tag(kOutput2Tag).AddPacket(cc->Inputs().Tag(kInputTag).Value()); 
-        }
-        else if (sel == mediapipe::CombinedDetection::ZOOM_IN)
-        {
-            cc->Outputs().Tag(kOutput3Tag).AddPacket(cc->Inputs().Tag(kInputTag).Value()); 
-        }
-        else if (sel == mediapipe::CombinedDetection::ZOOM_OUT)
-        {
-            cc->Outputs().Tag(kOutput4Tag).AddPacket(cc->Inputs().Tag(kInputTag).Value()); 
-        }
-        return absl::OkStatus();
-    }
-
-    private:
-};
-
-REGISTER_CALCULATOR(DemuxCalculator);
+    REGISTER_CALCULATOR(DemuxCalculator);
 
 }  // namespace mediapipe

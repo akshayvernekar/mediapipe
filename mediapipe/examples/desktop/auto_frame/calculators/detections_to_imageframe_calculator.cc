@@ -15,178 +15,187 @@
 #include "absl/memory/memory.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
-#include "mediapipe/framework/calculator_framework.h"
-#include "mediapipe/framework/port/ret_check.h"
-#include "mediapipe/framework/port/status.h"
 #include "mediapipe/examples/desktop/auto_frame/autoframe_messages.pb.h"
+#include "mediapipe/framework/calculator_framework.h"
 #include "mediapipe/framework/formats/image_frame_opencv.h"
 #include "mediapipe/framework/port/file_helpers.h"
-#include "mediapipe/framework/port/opencv_imgproc_inc.h"
 #include "mediapipe/framework/port/opencv_highgui_inc.h"
+#include "mediapipe/framework/port/opencv_imgproc_inc.h"
+#include "mediapipe/framework/port/ret_check.h"
+#include "mediapipe/framework/port/status.h"
 
 namespace mediapipe {
 
-namespace {
+    namespace {
 
-// inputs
-constexpr char kDetectionTag[] = "DETECTION";
-constexpr char kInputImageTag[] = "IMAGE";
+        // inputs
+        constexpr char kDetectionTag[] = "DETECTION";
+        constexpr char kInputImageTag[] = "IMAGE";
 
-//outputs
-constexpr char kOutputImageTag[] = "IMAGE";
+        // outputs
+        constexpr char kOutputImageTag[] = "IMAGE";
 
-constexpr float kMinFloat = std::numeric_limits<float>::lowest();
-constexpr float kMaxFloat = std::numeric_limits<float>::max();
+        constexpr float kMinFloat = std::numeric_limits<float>::lowest();
+        constexpr float kMaxFloat = std::numeric_limits<float>::max();
 
-}  // namespace
+    }  // namespace
 
-// A calculator that converts CombinedDetection proto to Image Frame data
-//
-// CombinedDetection object could have the output of Autoframe algo or Gesture recognition or Zoom 
-//
-// Example config:
-// node {
-//   calculator: "DetectionsToImageframeCalculator"
-//   input_stream: "DETECTION:detection"
-//   output_stream: "IMAGE:render_image"
-// }
-class DetectionsToImageframeCalculator : public CalculatorBase {
- public:
-  DetectionsToImageframeCalculator() {}
-  ~DetectionsToImageframeCalculator() override {}
-  DetectionsToImageframeCalculator(const DetectionsToImageframeCalculator&) =
-      delete;
-  DetectionsToImageframeCalculator& operator=(
-      const DetectionsToImageframeCalculator&) = delete;
+    // A calculator that converts CombinedDetection proto to Image Frame data
+    //
+    // CombinedDetection object could have the output of Autoframe algo or
+    // Gesture recognition or Zoom
+    //
+    // Example config:
+    // node {
+    //   calculator: "DetectionsToImageframeCalculator"
+    //   input_stream: "DETECTION:detection"
+    //   output_stream: "IMAGE:render_image"
+    // }
+    class DetectionsToImageframeCalculator : public CalculatorBase {
+       public:
+        DetectionsToImageframeCalculator() {}
+        ~DetectionsToImageframeCalculator() override {}
+        DetectionsToImageframeCalculator(
+            const DetectionsToImageframeCalculator&) = delete;
+        DetectionsToImageframeCalculator& operator=(
+            const DetectionsToImageframeCalculator&) = delete;
 
-  static absl::Status GetContract(CalculatorContract* cc);
+        static absl::Status GetContract(CalculatorContract* cc);
 
-  absl::Status Open(CalculatorContext* cc) override;
+        absl::Status Open(CalculatorContext* cc) override;
 
-  absl::Status Process(CalculatorContext* cc) override;
+        absl::Status Process(CalculatorContext* cc) override;
 
- protected:
-  int32 get_Euclidean_DistanceAB(int32 a_x, int32 a_y, int32 b_x, int32 b_y);
-  absl::Status CropAndResizeImageCV(cv::Mat& image_frame, const mediapipe::Rect& bbox);
-  absl::Status PutTextOnImageCV(cv::Mat& image_frame, const std::string gesture_strings);
-};
-REGISTER_CALCULATOR(DetectionsToImageframeCalculator);
+       protected:
+        int32 get_Euclidean_DistanceAB(int32 a_x, int32 a_y, int32 b_x,
+                                       int32 b_y);
+        absl::Status CropAndResizeImageCV(cv::Mat& image_frame,
+                                          const mediapipe::Rect& bbox);
+        absl::Status PutTextOnImageCV(cv::Mat& image_frame,
+                                      const std::string gesture_strings);
+    };
+    REGISTER_CALCULATOR(DetectionsToImageframeCalculator);
 
-int32 DetectionsToImageframeCalculator::get_Euclidean_DistanceAB(int32 a_x, int32 a_y, int32 b_x, int32 b_y)
-{
-    float dist = std::pow(a_x - b_x, 2) + pow(a_y - b_y, 2);
-    return int32(std::sqrt(dist));
-}
+    int32 DetectionsToImageframeCalculator::get_Euclidean_DistanceAB(
+        int32 a_x, int32 a_y, int32 b_x, int32 b_y) {
+        float dist = std::pow(a_x - b_x, 2) + pow(a_y - b_y, 2);
+        return int32(std::sqrt(dist));
+    }
 
-absl::Status DetectionsToImageframeCalculator::CropAndResizeImageCV(cv::Mat& image_frame, const mediapipe::Rect& bbox)
-{
-  int32 image_width = image_frame.cols;
-  int32 image_height = image_frame.rows;
-  std::cout << "inside CropAndResizeImageCV " << image_width << " : " <<  image_height << std::endl;
+    absl::Status DetectionsToImageframeCalculator::CropAndResizeImageCV(
+        cv::Mat& image_frame, const mediapipe::Rect& bbox) {
+        int32 image_width = image_frame.cols;
+        int32 image_height = image_frame.rows;
 
-  int32 x1 = bbox.x_center() - bbox.width()/2;
-  int32 y1 = bbox.y_center() - bbox.height()/2;
-  int32 x2 = bbox.x_center() + bbox.width()/2;
-  int32 y2 = bbox.y_center() + bbox.height()/2 ;
+        int32 x1 = bbox.x_center() - bbox.width() / 2;
+        int32 y1 = bbox.y_center() - bbox.height() / 2;
+        int32 bbox_width = bbox.width();
+        int32 bbox_height = bbox.height();
 
-  std::cout << "x1 " << x1 << ", y1 " <<  y1 << std::endl;
-  std::cout << "x2 " << x2 << ", y2 " <<  y2 << std::endl << std::endl;
-  cv::Rect roi(x1, y1, bbox.width(), bbox.height());
+        if (bbox_width == 0) bbox_width = image_width;
 
-  cv::Mat croppedRef = image_frame(roi); 
+        if (bbox_height == 0) bbox_height = image_height;
 
-  cv::Mat croppedImage ;
-  croppedRef.copyTo(croppedImage);
+        cv::Rect roi(x1, y1, bbox_width, bbox_height);
 
-  // image_frame = image_frame(cv::Range(x1,y1), cv::Range(x2,y2));
+        cv::Mat croppedRef = image_frame(roi);
 
-  std::cout << "inside CropAndResizeImageCV " << image_width << " : " <<  image_height << std::endl;
+        cv::Mat croppedImage;
+        croppedRef.copyTo(croppedImage);
+        cv::Mat resizedImage;
+        cv::resize(croppedImage, image_frame,
+                   cv::Size(image_width, image_height), cv::INTER_LINEAR);
 
-  cv::Mat resizedImage; 
-  cv::resize(croppedImage, image_frame, cv::Size(image_width, image_height), cv::INTER_LINEAR);  
+        return absl::OkStatus();
+    }
 
-  // cv::imshow(" Original Image", image_frame);
-	// cv::imshow("Resized Image", resizedImage);
-  // cv::waitKey(0);
+    absl::Status DetectionsToImageframeCalculator::PutTextOnImageCV(
+        cv::Mat& image_frame, const std::string gesture_strings) {
+        cv::putText(image_frame, gesture_strings, cv::Point(15, 70),
+                    cv::FONT_HERSHEY_PLAIN, 3, cv::Scalar(255, 255, 0, 255), 4);
 
-  return absl::OkStatus();
-}
+        return absl::OkStatus();
+    }
 
-absl::Status DetectionsToImageframeCalculator::PutTextOnImageCV(cv::Mat& image_frame, const std::string gesture_strings)
-{
-  cv::putText(image_frame, gesture_strings , cv::Point(15, 70), cv::FONT_HERSHEY_PLAIN, 3,
-          cv::Scalar(255, 255, 0, 255), 4);
+    absl::Status DetectionsToImageframeCalculator::GetContract(
+        CalculatorContract* cc) {
+        RET_CHECK(cc->Inputs().HasTag(kDetectionTag))
+            << "Exactly one of DETECTION or DETECTIONS input stream should be "
+               "provided.";
+        RET_CHECK_EQ((cc->Outputs().HasTag(kOutputImageTag) ? 1 : 0), 1)
+            << "Exactly one of NORM_RECT, RECT, NORM_RECTS or RECTS output "
+               "stream "
+               "should be provided.";
 
-  return absl::OkStatus();
-}
+        if (cc->Inputs().HasTag(kDetectionTag)) {
+            cc->Inputs().Tag(kDetectionTag).Set<mediapipe::CombinedDetection>();
+        }
 
-absl::Status DetectionsToImageframeCalculator::GetContract(CalculatorContract* cc) {
-  RET_CHECK(cc->Inputs().HasTag(kDetectionTag))
-      << "Exactly one of DETECTION or DETECTIONS input stream should be "
-         "provided.";
-  RET_CHECK_EQ(( cc->Outputs().HasTag(kOutputImageTag) ? 1 : 0) ,1)
-      << "Exactly one of NORM_RECT, RECT, NORM_RECTS or RECTS output stream "
-         "should be provided.";
+        if (cc->Inputs().HasTag(kInputImageTag)) {
+            cc->Inputs().Tag(kInputImageTag).Set<ImageFrame>();
+        }
 
-  if (cc->Inputs().HasTag(kDetectionTag)) {
-    cc->Inputs().Tag(kDetectionTag).Set<mediapipe::CombinedDetection>();
-  }
+        if (cc->Outputs().HasTag(kOutputImageTag)) {
+            cc->Outputs().Tag(kOutputImageTag).Set<mediapipe::ImageFrame>();
+        }
 
-  if (cc->Inputs().HasTag(kInputImageTag)) {
-    cc->Inputs().Tag(kInputImageTag).Set<ImageFrame>();
-  }
+        return absl::OkStatus();
+    }
 
-  if (cc->Outputs().HasTag(kOutputImageTag)) {
-    cc->Outputs().Tag(kOutputImageTag).Set<mediapipe::ImageFrame>();
-  }
+    absl::Status DetectionsToImageframeCalculator::Open(CalculatorContext* cc) {
+        cc->SetOffset(TimestampDiff(0));
 
-  return absl::OkStatus();
-}
+        return absl::OkStatus();
+    }
+    absl::Status DetectionsToImageframeCalculator::Process(
+        CalculatorContext* cc) {
+        if (cc->Inputs().HasTag(kDetectionTag) &&
+            cc->Inputs().Tag(kDetectionTag).IsEmpty()) {
+            cc->Outputs()
+                .Tag(kOutputImageTag)
+                .AddPacket(MakePacket<mediapipe::ImageFrame>().At(
+                    cc->InputTimestamp()));
+            return absl::OkStatus();
+        }
 
-absl::Status DetectionsToImageframeCalculator::Open(CalculatorContext* cc) {
-  cc->SetOffset(TimestampDiff(0));
+        if (cc->Inputs().HasTag(kInputImageTag) &&
+            cc->Inputs().Tag(kInputImageTag).IsEmpty()) {
+            cc->Outputs()
+                .Tag(kOutputImageTag)
+                .AddPacket(MakePacket<mediapipe::ImageFrame>().At(
+                    cc->InputTimestamp()));
+            return absl::OkStatus();
+        }
 
-  return absl::OkStatus();
-}
-absl::Status DetectionsToImageframeCalculator::Process(CalculatorContext* cc) {
-  if (cc->Inputs().HasTag(kDetectionTag) &&
-      cc->Inputs().Tag(kDetectionTag).IsEmpty()) {
-          cc->Outputs()
-              .Tag(kOutputImageTag)
-              .AddPacket(MakePacket<mediapipe::ImageFrame>().At(cc->InputTimestamp()));
-    return absl::OkStatus();
-  }
+        auto& input_detection =
+            cc->Inputs().Tag(kDetectionTag).Get<mediapipe::CombinedDetection>();
+        auto& input_frame = cc->Inputs().Tag(kInputImageTag).Get<ImageFrame>();
 
-  if (cc->Inputs().HasTag(kInputImageTag) &&
-      cc->Inputs().Tag(kDetectionTag).IsEmpty()) {
-          cc->Outputs()
-              .Tag(kOutputImageTag)
-              .AddPacket(MakePacket<mediapipe::ImageFrame>().At(cc->InputTimestamp()));
-    return absl::OkStatus();
-  }
+        cv::Mat input_frame_mat = mediapipe::formats::MatView(&input_frame);
+        cv::Mat input_frame_mat_cpy = input_frame_mat.clone();
+        // std::string s = input_detection.DebugString();
 
-  auto& input_detection = cc->Inputs().Tag(kDetectionTag).Get<mediapipe::CombinedDetection>();
-  auto& input_frame = cc->Inputs().Tag(kInputImageTag).Get<ImageFrame>();
+        if (input_detection.type() == mediapipe::CombinedDetection::BBOX) {
+            CropAndResizeImageCV(input_frame_mat_cpy, input_detection.bbox());
+        } else if (input_detection.type() ==
+                   mediapipe::CombinedDetection::GESTURE) {
+            PutTextOnImageCV(input_frame_mat_cpy, input_detection.gesture());
+        }
 
-  cv::Mat input_frame_mat = mediapipe::formats::MatView(&input_frame);
-  // std::string s = input_detection.DebugString();
+        std::unique_ptr<ImageFrame> output_frame =
+            absl::make_unique<ImageFrame>(
+                ImageFormat::SRGB, input_frame_mat_cpy.cols,
+                input_frame_mat_cpy.rows,
+                mediapipe::ImageFrame::kDefaultAlignmentBoundary);
 
-  if (input_detection.type() == mediapipe::CombinedDetection::BBOX){
-    CropAndResizeImageCV(input_frame_mat, input_detection.bbox());
-  }
-  else if (input_detection.type() == mediapipe::CombinedDetection::GESTURE){
-    PutTextOnImageCV(input_frame_mat, input_detection.gesture());
-  }
+        input_frame_mat_cpy.copyTo(formats::MatView(output_frame.get()));
+        cc->Outputs()
+            .Tag(kOutputImageTag)
+            .Add(output_frame.release(), cc->InputTimestamp());
 
-  std::unique_ptr<ImageFrame> output_frame = absl::make_unique<ImageFrame>(
-      ImageFormat::SRGB, input_frame_mat.cols, input_frame_mat.rows, mediapipe::ImageFrame::kDefaultAlignmentBoundary);
+        // cc->Outputs().Tag(kOutputImageTag).AddPacket(cc->Inputs().Tag(kInputImageTag).Value());
 
-  input_frame_mat.copyTo(formats::MatView(output_frame.get()));
-  cc->Outputs().Tag(kOutputImageTag).Add(output_frame.release(), cc->InputTimestamp());
-
-  // cc->Outputs().Tag(kOutputImageTag).AddPacket(cc->Inputs().Tag(kInputImageTag).Value());
-
-  return absl::OkStatus();
-}
+        return absl::OkStatus();
+    }
 
 }  // namespace mediapipe

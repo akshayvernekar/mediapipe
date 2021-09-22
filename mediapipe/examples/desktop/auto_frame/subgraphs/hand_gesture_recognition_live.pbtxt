@@ -58,9 +58,17 @@ node {
   output_stream: "HAND_ROIS_FROM_PALM_DETECTIONS:multi_palm_rects"
 }
 
+# Subgraph that fetches rectangle faces.
+node {
+  calculator: "ImagePropertiesCalculator"
+  input_stream: "IMAGE:throttled_input_video"
+  output_stream: "SIZE:size"
+}
+
 node{
-  calculator: "HandGestureRecognitionCalculator",
-  input_stream: "LANDMARKS:landmarks",
+  calculator: "HandGestureRecognitionCalculator"
+  input_stream: "LANDMARKS:landmarks"
+  input_stream: "IMAGE_SIZE:size"
   output_stream: "RECOGNIZED_HAND_GESTURE:gesture"
 }
 

@@ -14,7 +14,6 @@
 
 syntax = "proto2";
 import "mediapipe/framework/formats/rect.proto";
-
 package mediapipe;
 
 // A rectangle with rotation in image coordinates.

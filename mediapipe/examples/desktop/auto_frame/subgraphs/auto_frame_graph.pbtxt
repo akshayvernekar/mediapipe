@@ -6,6 +6,7 @@
 type: "AutoFrameSubgraph"
 
 input_stream: "IMAGE:input_video"
+input_stream: "PREV_DETECTION:prev_detection"
 output_stream: "DETECTION:detection_roi"
 
 # Throttles the images flowing downstream for flow control. It passes through
@@ -62,22 +63,25 @@ node {
 }
 
 # Keeps track of face landmarks from the previous frame.
-node {
-  calculator: "PreviousLoopbackCalculator"
-  input_stream: "MAIN:size"
-  input_stream: "LOOP:detection_roi"
-  input_stream_info: {
-    tag_index: "LOOP"
-    back_edge: true
-  }
-  output_stream: "PREV_LOOP:prev_detection_roi"
-}
+# node {
+#   calculator: "PreviousLoopbackCalculator"
+#   input_stream: "MAIN:size"
+#   input_stream: "LOOP:detection_roi"
+#   input_stream_info: {
+#     tag_index: "LOOP"
+#     back_edge: true
+#   }
+#   output_stream: "PREV_LOOP:prev_detection_roi"
+# }
 
 # Subgraph that fetches rectangle faces.
 node {
   calculator: "DetectionsToAutoframeROICalculator"
   input_stream: "DETECTIONS:detections"
   input_stream: "IMAGE_SIZE:size"
-  input_stream: "PREV_DETECTION_BBOX:prev_detection_roi"
+  input_stream: "PREV_DETECTION_BBOX:prev_detection"
   output_stream: "DETECTION_BBOX:detection_roi"
+  input_stream_handler {
+    input_stream_handler: "DefaultInputStreamHandler"
+  }
 }

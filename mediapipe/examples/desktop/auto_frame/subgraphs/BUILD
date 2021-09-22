@@ -68,7 +68,7 @@ mediapipe_simple_subgraph(
     deps = [
         ":desktop_tflite_calculators",
         "//mediapipe/examples/desktop/auto_frame/calculators:hand_gesture_recognition_calculator",
-        "//mediapipe/examples/desktop/auto_frame/calculators:put_text_on_image_calculator",
+        "//mediapipe/calculators/image:image_properties_calculator",
         "//mediapipe/calculators/core:constant_side_packet_calculator",
     ],
 )

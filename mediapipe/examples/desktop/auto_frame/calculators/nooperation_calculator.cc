@@ -12,54 +12,57 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "mediapipe/examples/desktop/auto_frame/autoframe_messages.pb.h"
 #include "mediapipe/framework/calculator_framework.h"
 #include "mediapipe/framework/formats/image_frame.h"
-#include "mediapipe/examples/desktop/auto_frame/autoframe_messages.pb.h"
 
 namespace mediapipe {
 
-namespace {
-    // inputs
-    constexpr char kInputTag[] = "IMAGE";
+    namespace {
+        // inputs
+        constexpr char kInputTag[] = "IMAGE";
+        constexpr char kPrevDetectionTag[] = "PREV_DETECTION";
 
-    //outputs
-    constexpr char kOutputTag[] = "DETECTION";
-} 
+        // outputs
+        constexpr char kOutputTag[] = "DETECTION";
+    }  // namespace
 
-class NoopCalculator : public CalculatorBase {
- public:
+    class NoopCalculator : public CalculatorBase {
+       public:
+        static absl::Status GetContract(CalculatorContract* cc) {
+            if (cc->Inputs().HasTag(kInputTag)) {
+                cc->Inputs().Tag(kInputTag).Set<ImageFrame>();
+            }
 
-    static absl::Status GetContract(CalculatorContract* cc)
-    {
-        if (cc->Inputs().HasTag(kInputTag)) {
-            cc->Inputs().Tag(kInputTag).Set<ImageFrame>();
+            if (cc->Inputs().HasTag(kPrevDetectionTag)) {
+                cc->Inputs()
+                    .Tag(kPrevDetectionTag)
+                    .Set<mediapipe::CombinedDetection>();
+            }
+
+            if (cc->Outputs().HasTag(kOutputTag)) {
+                cc->Outputs()
+                    .Tag(kOutputTag)
+                    .Set<mediapipe::CombinedDetection>();
+            }
+
+            return absl::OkStatus();
         }
 
-        if (cc->Outputs().HasTag(kOutputTag)) {
-            cc->Outputs().Tag(kOutputTag).Set<mediapipe::CombinedDetection>();
+        absl::Status Open(CalculatorContext* cc) override {
+            return absl::OkStatus();
         }
 
-        return absl::OkStatus();    
-    }
+        absl::Status Process(CalculatorContext* cc) override {
+            // this calculator essentially passes through the prev detection as
+            // current detection
+            cc->Outputs()
+                .Tag(kOutputTag)
+                .AddPacket(cc->Inputs().Tag(kPrevDetectionTag).Value());
+            return absl::OkStatus();
+        }
+    };
 
-    absl::Status Open(CalculatorContext* cc) override {
-        return absl::OkStatus();
-    }
-
-    absl::Status Process(CalculatorContext* cc) override 
-    {
-        std::unique_ptr<mediapipe::CombinedDetection> detection = std::make_unique<mediapipe::CombinedDetection>();
-        detection->set_type(mediapipe::CombinedDetection::NONE);
-
-        cc->Outputs()
-            .Tag(kOutputTag)
-            .AddPacket(Adopt(detection.release()).At(cc->InputTimestamp()));
-        return absl::OkStatus();
-    }
-
-    private:
-};
-
-REGISTER_CALCULATOR(NoopCalculator);
+    REGISTER_CALCULATOR(NoopCalculator);
 
 }  // namespace mediapipe

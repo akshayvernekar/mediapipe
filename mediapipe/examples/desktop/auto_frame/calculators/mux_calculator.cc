@@ -20,83 +20,79 @@
 
 namespace mediapipe {
 
-namespace {
-    // inputs
-    constexpr char kInput0Tag[] = "IN_IMG0";
-    constexpr char kInput1Tag[] = "IN_IMG1";
-    constexpr char kSelectTag[] = "SELECT";
+    namespace {
+        // inputs
+        constexpr char kInput0Tag[] = "IN_IMG0";
+        constexpr char kInput1Tag[] = "IN_IMG1";
+        constexpr char kSelectTag[] = "SELECT";
 
-    //outputs
-    constexpr char kOutputTag[] = "OUT_IMG";
-} 
+        // outputs
+        constexpr char kOutputTag[] = "OUT_IMG";
+    }  // namespace
 
-class MuxCalculator : public CalculatorBase {
- public:
+    class MuxCalculator : public CalculatorBase {
+       public:
+        static absl::Status GetContract(CalculatorContract* cc) {
+            for (int i = 0; i < cc->Inputs().NumEntries(); ++i) {
+                cc->Inputs().Index(i).SetSameAs(&cc->Outputs().Index(0));
+            }
+            if (cc->Inputs().HasTag(kInput0Tag)) {
+                cc->Inputs().Tag(kInput0Tag).Set<ImageFrame>();
+            }
 
-    static absl::Status GetContract(CalculatorContract* cc)
-    {
-        for (int i = 0; i < cc->Inputs().NumEntries(); ++i) {
-            cc->Inputs().Index(i).SetSameAs(&cc->Outputs().Index(0));
+            if (cc->Inputs().HasTag(kInput1Tag)) {
+                cc->Inputs().Tag(kInput1Tag).Set<ImageFrame>();
+            }
+
+            if (cc->Inputs().HasTag(kSelectTag)) {
+                cc->Inputs().Tag(kSelectTag).Set<int>();
+            }
+
+            if (cc->Outputs().HasTag(kOutputTag)) {
+                cc->Outputs().Tag(kOutputTag).Set<ImageFrame>();
+            }
+            return absl::OkStatus();
         }
-        if (cc->Inputs().HasTag(kInput0Tag)) {
-            cc->Inputs().Tag(kInput0Tag).Set<ImageFrame>();
+
+        absl::Status Open(CalculatorContext* cc) override {
+            cc->SetOffset(TimestampDiff(0));
+            return absl::OkStatus();
         }
 
-        if (cc->Inputs().HasTag(kInput1Tag)) {
-            cc->Inputs().Tag(kInput1Tag).Set<ImageFrame>();
-        }
-
-        if (cc->Inputs().HasTag(kSelectTag)) {
-            cc->Inputs().Tag(kSelectTag).Set<int>();
-        }
-
-        if (cc->Outputs().HasTag(kOutputTag)) {
-            cc->Outputs().Tag(kOutputTag).Set<ImageFrame>();
-        }
-        return absl::OkStatus();    
-    }
-
-    absl::Status Open(CalculatorContext* cc) override {
-        cc->SetOffset(TimestampDiff(0));
-        return absl::OkStatus();
-    }
-
-    absl::Status Process(CalculatorContext* cc) override 
-    {
-        LOG(ERROR) << "Process MuxCalculator";
-        if (!cc->Inputs().Tag(kSelectTag).IsEmpty())
-        {
-            int sel = cc->Inputs().Tag(kSelectTag).Get<int>();
-            LOG(ERROR) << "Process MuxCalculator: sel "<< sel;
-            if(sel == 0)
-            {
-                LOG(ERROR) << "Sending kInput0Tag "<< sel;
-                if(!cc->Inputs().Tag(kInput0Tag).IsEmpty())
-                {
-                    cc->Outputs().Tag(kOutputTag).AddPacket(cc->Inputs().Tag(kInput0Tag).Value());
-                    return absl::OkStatus();
+        absl::Status Process(CalculatorContext* cc) override {
+            LOG(ERROR) << "Process MuxCalculator";
+            if (!cc->Inputs().Tag(kSelectTag).IsEmpty()) {
+                int sel = cc->Inputs().Tag(kSelectTag).Get<int>();
+                LOG(ERROR) << "Process MuxCalculator: sel " << sel;
+                if (sel == 0) {
+                    LOG(ERROR) << "Sending kInput0Tag " << sel;
+                    if (!cc->Inputs().Tag(kInput0Tag).IsEmpty()) {
+                        cc->Outputs()
+                            .Tag(kOutputTag)
+                            .AddPacket(cc->Inputs().Tag(kInput0Tag).Value());
+                        return absl::OkStatus();
+                    }
+                } else if (sel == 1) {
+                    LOG(ERROR) << "Sending kInput0Tag " << sel;
+                    if (!cc->Inputs().Tag(kInput1Tag).IsEmpty()) {
+                        cc->Outputs()
+                            .Tag(kOutputTag)
+                            .AddPacket(cc->Inputs().Tag(kInput1Tag).Value());
+                        return absl::OkStatus();
+                    }
                 }
             }
-            else if (sel == 1)
-            {
-                LOG(ERROR) << "Sending kInput0Tag "<< sel;
-                if(!cc->Inputs().Tag(kInput1Tag).IsEmpty())
-                {
-                    cc->Outputs().Tag(kOutputTag).AddPacket(cc->Inputs().Tag(kInput1Tag).Value()); 
-                    return absl::OkStatus();
-                }
-                    
-            }
+
+            cc->Outputs()
+                .Tag(kOutputTag)
+                .AddPacket(MakePacket<ImageFrame>(ImageFormat::SRGB, 640, 480)
+                               .At(cc->InputTimestamp()));
+            return absl::OkStatus();
         }
 
-        cc->Outputs().Tag(kOutputTag)
-            .AddPacket(MakePacket<ImageFrame>(ImageFormat::SRGB, 640, 480).At(cc->InputTimestamp()));
-        return absl::OkStatus();
-    }
+       private:
+    };
 
-    private:
-};
-
-REGISTER_CALCULATOR(MuxCalculator);
+    REGISTER_CALCULATOR(MuxCalculator);
 
 }  // namespace mediapipe
