@@ -11,7 +11,7 @@ output_stream: "output_video"
 
 # VIDEO_PREP: Create a low frame rate stream for feature extraction.
 node {
-  calculator: "DemuxCalculator"
+  calculator: "ImageDemuxCalculator"
   input_stream: "IN_IMG:input_video"
   input_stream: "SELECT:select"
   output_stream: "OUT_IMG0:nop_in"
@@ -21,19 +21,42 @@ node {
   output_stream: "OUT_IMG4:zoomout_in"
 }
 
+# VIDEO_PREP: Create a low frame rate stream for feature extraction.
+node {
+  calculator: "DetectionDemuxCalculator"
+  input_stream: "IN:prev_detection"
+  input_stream: "SELECT:select"
+  output_stream: "OUT_NOOP:prev_detect_nop"
+  output_stream: "OUT_AUTOF:prev_detect_autoframe"
+  output_stream: "OUT_GESTURE:prev_detect_gesture"
+  output_stream: "OUT_ZIN:prev_detect_zoomin"
+  output_stream: "OUT_ZOUT:prev_detect_zoomout"
+}
+
 node {
   calculator: "NoopCalculator"
   input_stream: "IMAGE:nop_in"
-  input_stream: "PREV_DETECTION:prev_detection"
+  input_stream: "PREV_DETECTION:prev_detect_nop"
   output_stream: "DETECTION:noop_detection"
 }
 
 node {
   calculator: "AutoFrameSubgraph"
   input_stream: "IMAGE:autoframe_in"
-  input_stream: "PREV_DETECTION:prev_detection"
+  input_stream: "PREV_DETECTION:prev_detect_autoframe"
   output_stream: "DETECTION:autoframe_detection"
 }
+# node {
+#   calculator: "HandGestureRecognitionSubgraph"
+#   input_stream: "IMAGE:nop_in"
+#   output_stream: "GESTURE:noop_detection"
+# }
+
+# node {
+#   calculator: "HandGestureRecognitionSubgraph"
+#   input_stream: "IMAGE:autoframe_in"
+#   output_stream: "GESTURE:autoframe_detection"
+# }
 
 node {
   calculator: "HandGestureRecognitionSubgraph"
@@ -41,17 +64,29 @@ node {
   output_stream: "GESTURE:gesture_detection"
 }
 
+# node {
+#   calculator: "HandGestureRecognitionSubgraph"
+#   input_stream: "IMAGE:zoomin_in"
+#   output_stream: "GESTURE:zoom_in_detection"
+# }
+
+# node {
+#   calculator: "HandGestureRecognitionSubgraph"
+#   input_stream: "IMAGE:zoomout_in"
+#   output_stream: "GESTURE:zoom_out_detection"
+# }
+
 node {
   calculator: "ZoomInCalculator"
   input_stream: "IMAGE:zoomin_in"
-  input_stream: "PREV_DETECTION:prev_detection"
+  input_stream: "PREV_DETECTION:prev_detect_zoomin"
   output_stream: "DETECTION:zoom_in_detection"
 }
 
 node {
   calculator: "ZoomOutCalculator"
   input_stream: "IMAGE:zoomout_in"
-  input_stream: "PREV_DETECTION:prev_detection"
+  input_stream: "PREV_DETECTION:prev_detect_zoomout"
   output_stream: "DETECTION:zoom_out_detection"
 }
 

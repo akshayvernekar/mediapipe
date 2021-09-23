@@ -34,7 +34,7 @@ namespace mediapipe {
         constexpr char kOutput4Tag[] = "OUT_IMG4";
     }  // namespace
 
-    class DemuxCalculator : public CalculatorBase {
+    class ImageDemuxCalculator : public CalculatorBase {
        public:
         static absl::Status GetContract(CalculatorContract* cc) {
             if (cc->Inputs().HasTag(kInputTag)) {
@@ -106,6 +106,6 @@ namespace mediapipe {
        private:
     };
 
-    REGISTER_CALCULATOR(DemuxCalculator);
+    REGISTER_CALCULATOR(ImageDemuxCalculator);
 
 }  // namespace mediapipe

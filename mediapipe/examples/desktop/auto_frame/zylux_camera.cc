@@ -57,17 +57,17 @@ constexpr char kWindowName[] = "MediaPipe";
 #define VID_HEIGHT 480
 #endif
 
-#define DEFAULT_VIDEO_IN 0
+#define DEFAULT_VIDEO_IN 1
 #define DEFAULT_VIDEO_OUT "/dev/video6"
 
 #define AUTO_FRAME_GRAPH \
-    "mediapipe/examples/desktop/auto_frame/graphs/combined_graph.pbtxt"
+    "graphs/combined_graph.pbtxt"
 
 // std::string gPrevDetection;
 mediapipe::CombinedDetection gPrevDetection;
 bool gGrabFrames = false;
 mediapipe::CombinedDetection::OP_TYPE gOperation =
-    mediapipe::CombinedDetection::NOOP;
+    mediapipe::CombinedDetection::GESTURE_RECOG;
 
 ABSL_FLAG(std::string, input_video, "",
           "Camera input device. "
@@ -219,7 +219,7 @@ absl::Status RunMPPGraph() {
     gGrabFrames = true;
 
     // starting user input thread
-    std::thread userInputThread(UserInputReader);
+    // std::thread userInputThread(UserInputReader);
     // userInputThread.join();
 
     // initializing prev_detetction packet
@@ -293,33 +293,11 @@ absl::Status RunMPPGraph() {
             int written = write(output, yuv_image.data(0), framesize);
 
             // int written = write(output, output_frame_mat.data, framesize);
-            LOG(ERROR) << "written bytes : " << written;
+            // LOG(ERROR) << "written bytes : " << written;
             if (written < 0) {
                 std::cerr << "ERROR: could not write to output device!\n";
                 close(output);
                 break;
-            }
-
-            if (once == 0) {
-                int fd = open("i420image.yuv", O_CREAT | O_WRONLY);
-                int size = yuv_image.width() * yuv_image.height() * 1.5;
-                if (fd) {
-                    written = write(fd, yuv_image.data(0), size);
-                    LOG(ERROR) << "Wrote file i420image.yuv: " << written;
-                    close(fd);
-                }
-
-                mediapipe::YUVImage yuv_image2;
-                mediapipe::image_frame_util::ImageFrameToYUV2Image(output_frame,
-                                                                   &yuv_image2);
-                size = yuv_image2.width() * yuv_image2.height() * 2;
-                fd = open("yuy2image.yuv", O_CREAT | O_WRONLY);
-                if (fd) {
-                    written = write(fd, yuv_image2.data(0), size);
-                    LOG(ERROR) << "Wrote file yuy2image.yuv: " << written;
-                    close(fd);
-                }
-                once += 1;
             }
         } else {
             cv::cvtColor(output_frame_mat, output_frame_mat, cv::COLOR_RGB2BGR);
