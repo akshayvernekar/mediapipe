@@ -25,6 +25,7 @@
 #include "absl/flags/flag.h"
 #include "absl/flags/parse.h"
 #include "mediapipe/examples/desktop/auto_frame/autoframe_messages.pb.h"
+#include "mediapipe/examples/desktop/auto_frame/lirc/lirc_client.h"
 #include "mediapipe/framework/calculator_framework.h"
 #include "mediapipe/framework/formats/detection.pb.h"
 #include "mediapipe/framework/formats/image_frame.h"
@@ -48,6 +49,7 @@ constexpr char kOutputStream[] = "output_video";
 constexpr char kOutputStream_Roi[] = "curr_detection";
 
 constexpr char kWindowName[] = "MediaPipe";
+const char* kLircSockPath = "/run/lirc/lircd";
 
 #ifndef VID_WIDTH
 #define VID_WIDTH 640
@@ -60,8 +62,7 @@ constexpr char kWindowName[] = "MediaPipe";
 #define DEFAULT_VIDEO_IN 1
 #define DEFAULT_VIDEO_OUT "/dev/video6"
 
-#define AUTO_FRAME_GRAPH \
-    "graphs/combined_graph.pbtxt"
+#define AUTO_FRAME_GRAPH "graphs/combined_graph.pbtxt"
 
 // std::string gPrevDetection;
 mediapipe::CombinedDetection gPrevDetection;
@@ -115,6 +116,38 @@ void UserInputReader() {
 absl::Status roi_callback(mediapipe::Packet packet) {
     gPrevDetection = packet.Get<mediapipe::CombinedDetection>();
     return absl::OkStatus();
+}
+
+void lirc_callback(std::vector<std::string> recvd) {
+    if (recvd.size() < 0) return;
+
+    std::string key = recvd[2];
+    std::string count = recvd[1];
+
+    if (!key.compare("KEY_VOLUMEUP")) {
+        std::cout << "Zoom in" << std::endl;
+        gOperation = mediapipe::CombinedDetection::ZOOM_IN;
+    } else if (!key.compare("KEY_VOLUMEDOWN")) {
+        std::cout << "Zoom Out" << std::endl;
+        gOperation = mediapipe::CombinedDetection::ZOOM_OUT;
+    } else if (!key.compare("KEY_1") && !count.compare("00")) {
+        std::cout << "Autoframe" << std::endl;
+        if (gOperation != mediapipe::CombinedDetection::AUTO_FRAME)
+            gOperation = mediapipe::CombinedDetection::AUTO_FRAME;
+        else
+            gOperation = mediapipe::CombinedDetection::NOOP;
+    } else if (!key.compare("KEY_2") && !count.compare("00")) {
+        std::cout << "Gesture recognition" << std::endl;
+        if (gOperation != mediapipe::CombinedDetection::GESTURE_RECOG)
+            gOperation = mediapipe::CombinedDetection::GESTURE_RECOG;
+        else
+            gOperation = mediapipe::CombinedDetection::NOOP;
+    } else if (!key.compare("KEY_0") && !count.compare("00")) {
+        std::cout << "NOOP" << std::endl;
+        gOperation = mediapipe::CombinedDetection::NOOP;
+    } else {
+        std::cout << "Unkown Key Entered" << std::endl;
+    }
 }
 
 absl::Status RunMPPGraph() {
@@ -221,6 +254,9 @@ absl::Status RunMPPGraph() {
     // starting user input thread
     // std::thread userInputThread(UserInputReader);
     // userInputThread.join();
+
+    LircClient lirc_client;
+    lirc_client.Open(kLircSockPath, lirc_callback);
 
     // initializing prev_detetction packet
     gPrevDetection.set_type(mediapipe::CombinedDetection::BBOX);

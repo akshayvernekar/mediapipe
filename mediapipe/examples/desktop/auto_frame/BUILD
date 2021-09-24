@@ -64,5 +64,6 @@ cc_binary(
         "//mediapipe/examples/desktop/auto_frame/subgraphs:hand_gesture_recognition_live",
         "//mediapipe/framework/stream_handler:sync_set_input_stream_handler",
         "//mediapipe/examples/desktop/auto_frame/calculators:detections_to_imageframe_calculator",
+        "//mediapipe/examples/desktop/auto_frame/lirc:lirc_client",
     ],
 )
