@@ -20,6 +20,7 @@
 
 #include <chrono>
 #include <cstdlib>
+#include <queue>
 #include <thread>
 
 #include "absl/flags/flag.h"
@@ -64,10 +65,12 @@ const char* kLircSockPath = "/run/lirc/lircd";
 
 #define AUTO_FRAME_GRAPH "graphs/combined_graph.pbtxt"
 
+std::queue<mediapipe::CombinedDetection::OP_TYPE> gOperation_queue;
+
 // std::string gPrevDetection;
 mediapipe::CombinedDetection gPrevDetection;
 bool gGrabFrames = false;
-mediapipe::CombinedDetection::OP_TYPE gOperation =
+mediapipe::CombinedDetection::OP_TYPE gCurrentOperation =
     mediapipe::CombinedDetection::GESTURE_RECOG;
 
 ABSL_FLAG(std::string, input_video, "",
@@ -97,19 +100,19 @@ void UserInputReader() {
             gGrabFrames = false;
         } else if (user_input == '0') {
             std::cout << ">>>>> Turning on NOOP" << std::endl;
-            gOperation = mediapipe::CombinedDetection::NOOP;
+            gCurrentOperation = mediapipe::CombinedDetection::NOOP;
         } else if (user_input == '1') {
             std::cout << ">>>>> Turning on AUTOFRAME" << std::endl;
-            gOperation = mediapipe::CombinedDetection::AUTO_FRAME;
+            gCurrentOperation = mediapipe::CombinedDetection::AUTO_FRAME;
         } else if (user_input == '2') {
             std::cout << ">>>>> Turning on GESTURE_RECOG" << std::endl;
-            gOperation = mediapipe::CombinedDetection::GESTURE_RECOG;
+            gCurrentOperation = mediapipe::CombinedDetection::GESTURE_RECOG;
         } else if (user_input == '3') {
             std::cout << ">>>>> Zooming In" << std::endl;
-            gOperation = mediapipe::CombinedDetection::ZOOM_IN;
+            gCurrentOperation = mediapipe::CombinedDetection::ZOOM_IN;
         } else if (user_input == '4') {
             std::cout << ">>>>> Zooming Out" << std::endl;
-            gOperation = mediapipe::CombinedDetection::ZOOM_OUT;
+            gCurrentOperation = mediapipe::CombinedDetection::ZOOM_OUT;
         }
     }
 }
@@ -126,25 +129,56 @@ void lirc_callback(std::vector<std::string> recvd) {
 
     if (!key.compare("KEY_VOLUMEUP")) {
         std::cout << "Zoom in" << std::endl;
-        gOperation = mediapipe::CombinedDetection::ZOOM_IN;
+        // first check if autoframe or gestrure recognition is on and turn off
+        // those features
+
+        if ((gCurrentOperation == mediapipe::CombinedDetection::AUTO_FRAME) ||
+            (gCurrentOperation ==
+             mediapipe::CombinedDetection::GESTURE_RECOG)) {
+            gOperation_queue.push(mediapipe::CombinedDetection::RESET_VIEW);
+        }
+        gOperation_queue.push(mediapipe::CombinedDetection::ZOOM_IN);
+        gOperation_queue.push(mediapipe::CombinedDetection::NOOP);
     } else if (!key.compare("KEY_VOLUMEDOWN")) {
         std::cout << "Zoom Out" << std::endl;
-        gOperation = mediapipe::CombinedDetection::ZOOM_OUT;
-    } else if (!key.compare("KEY_1") && !count.compare("00")) {
-        std::cout << "Autoframe" << std::endl;
-        if (gOperation != mediapipe::CombinedDetection::AUTO_FRAME)
-            gOperation = mediapipe::CombinedDetection::AUTO_FRAME;
-        else
-            gOperation = mediapipe::CombinedDetection::NOOP;
-    } else if (!key.compare("KEY_2") && !count.compare("00")) {
-        std::cout << "Gesture recognition" << std::endl;
-        if (gOperation != mediapipe::CombinedDetection::GESTURE_RECOG)
-            gOperation = mediapipe::CombinedDetection::GESTURE_RECOG;
-        else
-            gOperation = mediapipe::CombinedDetection::NOOP;
+        if ((gCurrentOperation == mediapipe::CombinedDetection::AUTO_FRAME) ||
+            (gCurrentOperation ==
+             mediapipe::CombinedDetection::GESTURE_RECOG)) {
+            gOperation_queue.push(mediapipe::CombinedDetection::RESET_VIEW);
+        }
+        gOperation_queue.push(mediapipe::CombinedDetection::ZOOM_OUT);
+        gOperation_queue.push(mediapipe::CombinedDetection::NOOP);
+    } else if (!key.compare("KEY_1")) {
+        if (!count.compare("00")) {
+            if (gCurrentOperation != mediapipe::CombinedDetection::AUTO_FRAME) {
+                std::cout << "Starting Autoframe" << std::endl;
+                gOperation_queue.push(mediapipe::CombinedDetection::AUTO_FRAME);
+            } else {
+                std::cout << "Ending Autoframe" << std::endl;
+                gOperation_queue.push(mediapipe::CombinedDetection::RESET_VIEW);
+                gOperation_queue.push(mediapipe::CombinedDetection::NOOP);
+            }
+        }
+    } else if (!key.compare("KEY_2")) {
+        if (!count.compare("00")) {
+            std::cout << "Gesture recognition" << std::endl;
+            if (gCurrentOperation !=
+                mediapipe::CombinedDetection::GESTURE_RECOG) {
+                std::cout << "Starting GR" << std::endl;
+                gOperation_queue.push(
+                    mediapipe::CombinedDetection::GESTURE_RECOG);
+            } else {
+                std::cout << "Ending GR" << std::endl;
+                gOperation_queue.push(mediapipe::CombinedDetection::RESET_VIEW);
+                gOperation_queue.push(mediapipe::CombinedDetection::NOOP);
+            }
+        }
     } else if (!key.compare("KEY_0") && !count.compare("00")) {
-        std::cout << "NOOP" << std::endl;
-        gOperation = mediapipe::CombinedDetection::NOOP;
+        if (!count.compare("00")) {
+            std::cout << "NOOP" << std::endl;
+            gOperation_queue.push(mediapipe::CombinedDetection::RESET_VIEW);
+            gOperation_queue.push(mediapipe::CombinedDetection::NOOP);
+        }
     } else {
         std::cout << "Unkown Key Entered" << std::endl;
     }
@@ -292,6 +326,12 @@ absl::Status RunMPPGraph() {
         size_t frame_timestamp_us =
             (double)cv::getTickCount() / (double)cv::getTickFrequency() * 1e6;
 
+        // check operation queue
+        if (gOperation_queue.size() > 0) {
+            gCurrentOperation = gOperation_queue.front();
+            gOperation_queue.pop();
+        }
+
         MP_RETURN_IF_ERROR(auto_frame_graph.AddPacketToInputStream(
             kInputStream, mediapipe::Adopt(input_frame1.release())
                               .At(mediapipe::Timestamp(frame_timestamp_us))));
@@ -299,7 +339,7 @@ absl::Status RunMPPGraph() {
         MP_RETURN_IF_ERROR(auto_frame_graph.AddPacketToInputStream(
             kInputSelectStream,
             mediapipe::MakePacket<mediapipe::CombinedDetection::OP_TYPE>(
-                gOperation)
+                gCurrentOperation)
                 .At(mediapipe::Timestamp(frame_timestamp_us))));
 
         MP_RETURN_IF_ERROR(auto_frame_graph.AddPacketToInputStream(

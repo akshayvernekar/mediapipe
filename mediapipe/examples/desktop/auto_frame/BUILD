@@ -36,10 +36,21 @@ mediapipe_cc_proto_library(
     deps = [":autoframe_messages_proto"],
 )
 
+cc_library(
+    name = "input_image_pkt",
+    hdrs = ["include/input_image_packet.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//mediapipe/examples/desktop/auto_frame:autoframe_messages_cc_proto",      
+        "//mediapipe/framework/formats:image_frame", 
+    ],
+)
+
 cc_binary(
     name = "autoframe_cpu",
     srcs = ["zylux_camera.cc"],
     deps = [
+        "//mediapipe/examples/desktop/auto_frame:input_image_pkt",
         "@com_google_absl//absl/flags:flag",
         "@com_google_absl//absl/flags:parse",
         "//mediapipe/examples/desktop/auto_frame:autoframe_messages_cc_proto",
@@ -58,8 +69,8 @@ cc_binary(
         "//mediapipe/examples/desktop/auto_frame/calculators:nooperation_calculator",
         "//mediapipe/examples/desktop/auto_frame/calculators:zoomin_calculator",
         "//mediapipe/examples/desktop/auto_frame/calculators:zoomout_calculator",
-        "//mediapipe/examples/desktop/auto_frame/calculators:image_demux_calculator",
-        "//mediapipe/examples/desktop/auto_frame/calculators:detection_demux_calculator",
+        "//mediapipe/examples/desktop/auto_frame/calculators:generic_demux_calculator",
+        "//mediapipe/examples/desktop/auto_frame/calculators:reset_view_calculator",
         "//mediapipe/examples/desktop/auto_frame/subgraphs:auto_frame_graph",
         "//mediapipe/examples/desktop/auto_frame/subgraphs:hand_gesture_recognition_live",
         "//mediapipe/framework/stream_handler:sync_set_input_stream_handler",

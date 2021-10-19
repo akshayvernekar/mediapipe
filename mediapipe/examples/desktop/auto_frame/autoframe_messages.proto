@@ -31,6 +31,7 @@ message CombinedDetection {
         GESTURE_RECOG = 2;
         ZOOM_IN = 3;
         ZOOM_OUT = 4;
+        RESET_VIEW = 5;
     }
 
     optional TYPE type = 1 [default = NONE];

@@ -16,7 +16,7 @@ make -C mediapipe/examples/coral PLATFORM=arm64 docker
 You only have to run the above command first time, the environment is saved on disk so that you can compile the application again. Follow the following steps to compile the autoframe binary second time onwards
 
 ```bash
-docker run -i BuildContainer
+docker start -i BuildContainer
 ```
 
 ### Installing Opencv 4.4

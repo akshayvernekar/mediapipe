@@ -10,27 +10,53 @@ output_stream: "curr_detection"
 output_stream: "output_video"
 
 # VIDEO_PREP: Create a low frame rate stream for feature extraction.
+# node {
+#   calculator: "ImageDemuxCalculator"
+#   input_stream: "IN_IMG:input_video"
+#   input_stream: "SELECT:select"
+#   output_stream: "OUT_IMG0:nop_in"
+#   output_stream: "OUT_IMG1:autoframe_in"
+#   output_stream: "OUT_IMG2:gesture_in"
+#   output_stream: "OUT_IMG3:zoomin_in"
+#   output_stream: "OUT_IMG4:zoomout_in"
+# }
+
+# # VIDEO_PREP: Create a low frame rate stream for feature extraction.
+# node {
+#   calculator: "DetectionDemuxCalculator"
+#   input_stream: "IN:prev_detection"
+#   input_stream: "SELECT:select"
+#   output_stream: "OUT_NOOP:prev_detect_nop"
+#   output_stream: "OUT_AUTOF:prev_detect_autoframe"
+#   output_stream: "OUT_GESTURE:prev_detect_gesture"
+#   output_stream: "OUT_ZIN:prev_detect_zoomin"
+#   output_stream: "OUT_ZOUT:prev_detect_zoomout"
+# }
+
+# VIDEO_PREP: Create a low frame rate stream for feature extraction.
 node {
-  calculator: "ImageDemuxCalculator"
-  input_stream: "IN_IMG:input_video"
+  calculator: "GenericDemuxCalculator"
+  input_stream: "IN:input_video"
   input_stream: "SELECT:select"
-  output_stream: "OUT_IMG0:nop_in"
-  output_stream: "OUT_IMG1:autoframe_in"
-  output_stream: "OUT_IMG2:gesture_in"
-  output_stream: "OUT_IMG3:zoomin_in"
-  output_stream: "OUT_IMG4:zoomout_in"
+  output_stream: "nop_in"
+  output_stream: "autoframe_in"
+  output_stream: "gesture_in"
+  output_stream: "zoomin_in"
+  output_stream: "zoomout_in"
+  output_stream: "reset_view"
 }
 
 # VIDEO_PREP: Create a low frame rate stream for feature extraction.
 node {
-  calculator: "DetectionDemuxCalculator"
+  calculator: "GenericDemuxCalculator"
   input_stream: "IN:prev_detection"
   input_stream: "SELECT:select"
-  output_stream: "OUT_NOOP:prev_detect_nop"
-  output_stream: "OUT_AUTOF:prev_detect_autoframe"
-  output_stream: "OUT_GESTURE:prev_detect_gesture"
-  output_stream: "OUT_ZIN:prev_detect_zoomin"
-  output_stream: "OUT_ZOUT:prev_detect_zoomout"
+  output_stream: "prev_detect_nop"
+  output_stream: "prev_detect_autoframe"
+  output_stream: "prev_detect_gesture"
+  output_stream: "prev_detect_zoomin"
+  output_stream: "prev_detect_zoomout"
+  output_stream: "prev_detect_resetview"
 }
 
 node {
@@ -91,12 +117,20 @@ node {
 }
 
 node {
+  calculator: "ResetViewCalculator"
+  input_stream: "IMAGE:reset_view"
+  input_stream: "PREV_DETECTION:prev_detect_resetview"
+  output_stream: "DETECTION:reset_view_detection"
+}
+
+node {
   calculator: "ImmediateMuxCalculator"
   input_stream: "noop_detection"
   input_stream: "gesture_detection"
   input_stream: "autoframe_detection"
   input_stream: "zoom_in_detection"
   input_stream: "zoom_out_detection"
+  input_stream: "reset_view_detection"
   output_stream: "curr_detection"
   input_stream_handler {
     input_stream_handler: "ImmediateInputStreamHandler"
